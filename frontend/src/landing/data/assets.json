@@ -1,0 +1,590 @@
+{
+ "country-aereo": {
+  "width": 1920,
+  "height": 1080,
+  "variants": {
+   "day": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/country-aereo-day-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/country-aereo-day-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/countries/country-aereo-day-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/countries/country-aereo-day-1920.webp"
+    }
+   ],
+   "night": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/country-aereo-night-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/country-aereo-night-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/countries/country-aereo-night-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/countries/country-aereo-night-1920.webp"
+    }
+   ],
+   "sunset": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/country-aereo-sunset-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/country-aereo-sunset-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/countries/country-aereo-sunset-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/countries/country-aereo-sunset-1920.webp"
+    }
+   ],
+   "premium": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/country-aereo-premium-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/country-aereo-premium-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/countries/country-aereo-premium-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/countries/country-aereo-premium-1920.webp"
+    }
+   ],
+   "future": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/country-aereo-future-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/country-aereo-future-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/countries/country-aereo-future-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/countries/country-aereo-future-1920.webp"
+    }
+   ]
+  },
+  "placeholder": "data:image/webp;base64,UklGRqwAAABXRUJQVlA4IKAAAAAwBACdASoYAA4APu1iqU2ppaOiMAgBMB2JZgC7ABU9RP7opOfQgUHF/OgA/SIVjbLQY1+4swYQxtGGMWRz/VZsCHtQIqwWiiPnQKiSMZ+/jh/bWqaL9p3xUIIquNXpLkyI9vottSuGs+BRg6HS/+B4kjUfR7a+9CUy7e0vWqSNPc3KIKi/xlQkztjOyV6eOo8+CNpM4Rgoi6CcaTK6gYAA",
+  "id": "country-aereo",
+  "category": "countries",
+  "tags": [
+   "countries",
+   "premium"
+  ],
+  "title": "Country con piscinas y espacios verdes",
+  "alt": "Vista aérea de un country con casas, piscinas, arboledas y calles internas"
+ },
+ "club-house": {
+  "width": 1206,
+  "height": 902,
+  "variants": {
+   "day": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/club-house-day-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/club-house-day-960.webp"
+    },
+    {
+     "w": 1206,
+     "src": "/generated-assets/countries/club-house-day-1206.webp"
+    }
+   ],
+   "night": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/club-house-night-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/club-house-night-960.webp"
+    },
+    {
+     "w": 1206,
+     "src": "/generated-assets/countries/club-house-night-1206.webp"
+    }
+   ],
+   "sunset": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/club-house-sunset-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/club-house-sunset-960.webp"
+    },
+    {
+     "w": 1206,
+     "src": "/generated-assets/countries/club-house-sunset-1206.webp"
+    }
+   ],
+   "premium": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/club-house-premium-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/club-house-premium-960.webp"
+    },
+    {
+     "w": 1206,
+     "src": "/generated-assets/countries/club-house-premium-1206.webp"
+    }
+   ],
+   "future": [
+    {
+     "w": 480,
+     "src": "/generated-assets/countries/club-house-future-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/countries/club-house-future-960.webp"
+    },
+    {
+     "w": 1206,
+     "src": "/generated-assets/countries/club-house-future-1206.webp"
+    }
+   ]
+  },
+  "placeholder": "data:image/webp;base64,UklGRs4AAABXRUJQVlA4IMIAAABwBQCdASoYABIAPu1qrVCppaQiqAqpMB2JZACdABEa6KWzn33XnG2pL2ZU2HjNyIvdzcSgAP7tVrP/xagWTZ/BcMFzeqSTETT7TSOfokWMRCV36+7gbcva8j17yK4840ijrCi5WnZcA/ODhzEMFiJw/pm9RAWrHxt69i9T8obFlNjtWe7JsoIBfBd/27weyh9/D2idu+Uzm99Yr20c8vwxxuMQ7LWHvpV0hlNS6Lk3cQCc62y37dDyODx9r9kO7iFwAA==",
+  "id": "club-house",
+  "category": "countries",
+  "tags": [
+   "countries",
+   "premium"
+  ],
+  "title": "Club House y piscinas",
+  "alt": "Club House moderno con dos piscinas, parque y montañas de fondo"
+ },
+ "barrio-lotes": {
+  "width": 468,
+  "height": 306,
+  "variants": {
+   "day": [
+    {
+     "w": 468,
+     "src": "/generated-assets/neighborhoods/barrio-lotes-day-468.webp"
+    }
+   ],
+   "night": [
+    {
+     "w": 468,
+     "src": "/generated-assets/neighborhoods/barrio-lotes-night-468.webp"
+    }
+   ],
+   "sunset": [
+    {
+     "w": 468,
+     "src": "/generated-assets/neighborhoods/barrio-lotes-sunset-468.webp"
+    }
+   ],
+   "premium": [
+    {
+     "w": 468,
+     "src": "/generated-assets/neighborhoods/barrio-lotes-premium-468.webp"
+    }
+   ],
+   "future": [
+    {
+     "w": 468,
+     "src": "/generated-assets/neighborhoods/barrio-lotes-future-468.webp"
+    }
+   ]
+  },
+  "placeholder": "data:image/webp;base64,UklGRpgAAABXRUJQVlA4IIwAAAAQBACdASoYABAAPu1iqU2ppaOiMAgBMB2JaAAAYfFs2V3+sxuLIgtOAAD+d4Eq004AcOcDBoYZP9q4v2pY6dFHM18uPG6VTvI0yZUFbxhiit3GGvG/2mX5nEEluZayo14L8HYq7omIuFA086bnP/8G/MbuB/0yy5pBtyAYkxZWwESf0GLwAftQ2skAAA==",
+  "id": "barrio-lotes",
+  "category": "neighborhoods",
+  "tags": [
+   "barrios"
+  ],
+  "title": "Barrio cerrado con lotes",
+  "alt": "Vista aérea de un barrio cerrado con calles curvas y lotes"
+ },
+ "torres": {
+  "width": 1280,
+  "height": 961,
+  "variants": {
+   "day": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torres-day-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torres-day-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torres-day-1280.webp"
+    }
+   ],
+   "night": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torres-night-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torres-night-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torres-night-1280.webp"
+    }
+   ],
+   "sunset": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torres-sunset-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torres-sunset-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torres-sunset-1280.webp"
+    }
+   ],
+   "premium": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torres-premium-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torres-premium-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torres-premium-1280.webp"
+    }
+   ],
+   "future": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torres-future-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torres-future-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torres-future-1280.webp"
+    }
+   ]
+  },
+  "placeholder": "data:image/webp;base64,UklGRtoAAABXRUJQVlA4IM4AAABwBQCdASoYABIAPu1qrFEppaQiqAqpMB2JbACdMt8BtqmWqbnj+84zAYx66upkJzp6GznAAP7N++gWyVUV50nGQwxMg729b0qInhcWYsojG2pPZPfeNyiH3fhI/Bm2E++pbNIRrIxCYOeU1hOow6w/jgQB/8/62Q3nTk+9zy78r/+Yuf3xck6TLUat1CGaJ8ptT15I8+19S830Zd8OHhc2GNpZ4PQF8V2FV9Oc/1MGFKHv32fI0aDImjkRPKzNKBiJcGHx1GOknynujgAAAA==",
+  "id": "torres",
+  "category": "buildings",
+  "tags": [
+   "edificios",
+   "premium"
+  ],
+  "title": "Torres premium",
+  "alt": "Torres de vidrio vistas desde abajo contra un cielo azul"
+ },
+ "torre-lobby": {
+  "width": 1280,
+  "height": 720,
+  "variants": {
+   "day": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torre-lobby-day-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torre-lobby-day-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torre-lobby-day-1280.webp"
+    }
+   ],
+   "night": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torre-lobby-night-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torre-lobby-night-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torre-lobby-night-1280.webp"
+    }
+   ],
+   "sunset": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torre-lobby-sunset-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torre-lobby-sunset-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torre-lobby-sunset-1280.webp"
+    }
+   ],
+   "premium": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torre-lobby-premium-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torre-lobby-premium-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torre-lobby-premium-1280.webp"
+    }
+   ],
+   "future": [
+    {
+     "w": 480,
+     "src": "/generated-assets/buildings/torre-lobby-future-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/buildings/torre-lobby-future-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/buildings/torre-lobby-future-1280.webp"
+    }
+   ]
+  },
+  "placeholder": "data:image/webp;base64,UklGRpoAAABXRUJQVlA4II4AAAAQBACdASoYAA4APu1iqU2ppaOiMAgBMB2JbACdIExB82Pb1u3LXjjkMAD9IZHkpwMtFMYsRpysXdp3C7ApFWb6lUrsgaRexuLvCTjzRM+DTa0EGLpUbgMXOU5tWvue0Gk5jv/bh2UZdfSh5AvbCVDYEus/zpxvj0f3CvWn3tn2K/dnUHQ794X1h86cmQAA",
+  "id": "torre-lobby",
+  "category": "buildings",
+  "tags": [
+   "edificios",
+   "premium"
+  ],
+  "title": "Torre con lobby iluminado",
+  "alt": "Torre residencial de noche con lobby iluminado en tonos cálidos"
+ },
+ "hero": {
+  "width": 1920,
+  "height": 1080,
+  "variants": {
+   "day": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/hero-day-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/hero-day-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/home/hero-day-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/home/hero-day-1920.webp"
+    }
+   ],
+   "night": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/hero-night-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/hero-night-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/home/hero-night-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/home/hero-night-1920.webp"
+    }
+   ],
+   "sunset": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/hero-sunset-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/hero-sunset-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/home/hero-sunset-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/home/hero-sunset-1920.webp"
+    }
+   ],
+   "premium": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/hero-premium-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/hero-premium-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/home/hero-premium-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/home/hero-premium-1920.webp"
+    }
+   ],
+   "future": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/hero-future-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/hero-future-960.webp"
+    },
+    {
+     "w": 1440,
+     "src": "/generated-assets/home/hero-future-1440.webp"
+    },
+    {
+     "w": 1920,
+     "src": "/generated-assets/home/hero-future-1920.webp"
+    }
+   ]
+  },
+  "placeholder": "data:image/webp;base64,UklGRqwAAABXRUJQVlA4IKAAAAAwBACdASoYAA4APu1iqU2ppaOiMAgBMB2JZgC7ABU9RP7opOfQgUHF/OgA/SIVjbLQY1+4swYQxtGGMWRz/VZsCHtQIqwWiiPnQKiSMZ+/jh/bWqaL9p3xUIIquNXpLkyI9vottSuGs+BRg6HS/+B4kjUfR7a+9CUy7e0vWqSNPc3KIKi/xlQkztjOyV6eOo8+CNpM4Rgoi6CcaTK6gYAA",
+  "id": "hero",
+  "category": "home",
+  "tags": [],
+  "title": "Country con piscinas y espacios verdes",
+  "alt": "Vista aérea de un country con casas, piscinas, arboledas y calles internas"
+ },
+ "cta": {
+  "width": 1280,
+  "height": 720,
+  "variants": {
+   "day": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/cta-day-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/cta-day-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/home/cta-day-1280.webp"
+    }
+   ],
+   "night": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/cta-night-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/cta-night-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/home/cta-night-1280.webp"
+    }
+   ],
+   "sunset": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/cta-sunset-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/cta-sunset-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/home/cta-sunset-1280.webp"
+    }
+   ],
+   "premium": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/cta-premium-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/cta-premium-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/home/cta-premium-1280.webp"
+    }
+   ],
+   "future": [
+    {
+     "w": 480,
+     "src": "/generated-assets/home/cta-future-480.webp"
+    },
+    {
+     "w": 960,
+     "src": "/generated-assets/home/cta-future-960.webp"
+    },
+    {
+     "w": 1280,
+     "src": "/generated-assets/home/cta-future-1280.webp"
+    }
+   ]
+  },
+  "placeholder": "data:image/webp;base64,UklGRpoAAABXRUJQVlA4II4AAAAQBACdASoYAA4APu1iqU2ppaOiMAgBMB2JbACdIExB82Pb1u3LXjjkMAD9IZHkpwMtFMYsRpysXdp3C7ApFWb6lUrsgaRexuLvCTjzRM+DTa0EGLpUbgMXOU5tWvue0Gk5jv/bh2UZdfSh5AvbCVDYEus/zpxvj0f3CvWn3tn2K/dnUHQ794X1h86cmQAA",
+  "id": "cta",
+  "category": "home",
+  "tags": [],
+  "title": "Torre con lobby iluminado",
+  "alt": "Torre residencial de noche con lobby iluminado en tonos cálidos"
+ }
+}

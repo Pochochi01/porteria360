@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /panel
+# Al publicar, agregar la URL absoluta del sitemap:
+# Sitemap: https://TU-DOMINIO/sitemap.xml
