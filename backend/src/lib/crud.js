@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { tx } from './db.js';
+import { RECEIPTS_DIR } from './paths.js';
 import { ah, audit, validate, HttpError, toSql, parseSql } from './helpers.js';
 import { requireRole } from '../middleware/auth.js';
 
@@ -93,7 +94,7 @@ export function mountModel(router, m) {
         return { row, deps, files: extra.files || [] };
       });
       // Los archivos se borran recién después del commit
-      await Promise.all(files.filter(Boolean).map((f) => fs.unlink(path.resolve('uploads/receipts', path.basename(f))).catch(() => {})));
+      await Promise.all(files.filter(Boolean).map((f) => fs.unlink(path.join(RECEIPTS_DIR, path.basename(f))).catch(() => {})));
       await audit(req, m.entity, row.id, 'delete', { registro: strip(row, m.hidden), cascada: deps });
       res.json({ ok: true, deleted: row.id, cascade: deps });
     }));

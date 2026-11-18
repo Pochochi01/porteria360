@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './lib/env.js'; // primero: carga backend/.env sin depender del cwd
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -21,14 +21,14 @@ import platformRoutes from './routes/platform.js';
 import crudRoutes from './routes/crud.js';
 import docsRoutes from './routes/docs.js';
 import brandingRoutes, { publicBranding } from './routes/branding.js';
-import { UPLOADS, PRIVATE_UPLOADS } from './lib/files.js';
+import { UPLOADS, PRIVATE_UPLOADS, RECEIPTS_DIR, frontendDist } from './lib/paths.js';
 import dniRoutes from './routes/dni.js';
 import financeRoutes from './routes/finance.js';
 import ownerPortalRoutes from './routes/ownerPortal.js';
 import { pool } from './lib/db.js';
 import { shutdownOcr } from './lib/dniOcr.js';
 
-fs.mkdirSync('uploads/receipts', { recursive: true });
+fs.mkdirSync(RECEIPTS_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS, { recursive: true });
 fs.mkdirSync(PRIVATE_UPLOADS, { recursive: true }); // comprobantes de gastos: nunca se sirven estáticos
 
@@ -73,10 +73,13 @@ app.use('/api', api);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
 // Producción: el mismo servidor entrega la PWA compilada (frontend/dist)
-const dist = path.resolve(process.env.FRONTEND_DIST || '../frontend/dist');
-if (fs.existsSync(dist)) {
+const dist = frontendDist();
+if (!fs.existsSync(path.join(dist, 'index.html'))) {
+  if (process.env.NODE_ENV === 'production') { console.warn(`[static] No se encontró la PWA compilada en ${dist}. Ejecutá "npm run build".`); }
+} else {
+  console.log(`[static] PWA servida desde ${dist}`);
   app.use(express.static(dist, { index: false, setHeaders: (res, f) => {
-    if (f.endsWith('sw.js') || f.endsWith('.html')) {
+    if (f.endsWith('sw.js') || f.endsWith('.html') || f.endsWith('.webmanifest')) {
       res.setHeader('Cache-Control', 'no-cache');
     } else if (/[\\/]assets[\\/]/.test(f)) {
       // Archivos con hash en el nombre (JS/CSS): caché de 1 año. [\\/] cubre separadores de Windows y Unix.
@@ -88,7 +91,13 @@ if (fs.existsSync(dist)) {
   // "/" → portada prerenderizada; cualquier otra ruta de la SPA → app.html (sin el HTML de la portada)
   const appHtml = fs.existsSync(path.join(dist, 'app.html')) ? 'app.html' : 'index.html';
   app.get('/', (req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(dist, 'index.html')));
-  app.get(/^(?!\/api|\/socket\.io|\/uploads).*/, (req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(dist, appHtml)));
+  // Un archivo inexistente (/assets/x.css de un build anterior, /icono.png) responde 404 real:
+  // nunca el HTML de la SPA, que el navegador rechazaría por MIME y dejaría la página sin estilos.
+  app.use(['/assets', '/generated-assets'], (req, res) => res.status(404).end());
+  app.get(/^(?!\/api|\/socket\.io|\/uploads).*/, (req, res) => {
+    if (path.extname(req.path)) { return res.status(404).end(); }
+    res.set('Cache-Control', 'no-cache').sendFile(path.join(dist, appHtml));
+  });
 }
 
 app.use((err, req, res, _next) => { // 4 parámetros: así Express lo trata como manejador de errores
@@ -124,7 +133,9 @@ server.on('error', (e) => {
   console.error(e.code === 'EADDRINUSE' ? `El puerto ${port} ya está en uso (¿otro backend abierto?)` : e);
   process.exit(1);
 });
-server.listen(port, () => console.log(`API en http://127.0.0.1:${port} (${process.env.NODE_ENV || 'development'})`));
+// HOST=127.0.0.1 en producción: solo accesible a través de Nginx (sin HOST escucha en todas las interfaces)
+const host = process.env.HOST || undefined;
+server.listen(port, host, () => console.log(`API en http://${host || '0.0.0.0'}:${port} (${process.env.NODE_ENV || 'development'})`));
 
 // Apagado ordenado (Ctrl+C, docker stop, PM2, systemd): termina lo pendiente y libera recursos
 let closing = false;

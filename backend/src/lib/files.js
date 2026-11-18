@@ -8,8 +8,9 @@ import sharp from 'sharp';
 import { query } from './db.js';
 import { HttpError } from './helpers.js';
 
-export const UPLOADS = path.resolve('uploads/tenants');
-export const PRIVATE_UPLOADS = path.resolve('uploads/private');
+import { UPLOADS, PRIVATE_UPLOADS } from './paths.js';
+
+export { UPLOADS, PRIVATE_UPLOADS };
 
 export const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 export const VIDEO_MIME = ['video/mp4', 'video/webm'];

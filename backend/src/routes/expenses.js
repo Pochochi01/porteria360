@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
 import { query, tx } from '../lib/db.js';
+import { RECEIPTS_DIR } from '../lib/paths.js';
 import { ah, audit, validate, HttpError } from '../lib/helpers.js';
 import { requireRole, hasRole } from '../middleware/auth.js';
 import { assertLotAccess, inLots, userLotIds } from '../lib/ownership.js';
@@ -15,7 +16,7 @@ const ADMIN = ['admin'];
 const excelUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 const receiptUpload = multer({
   storage: multer.diskStorage({
-    destination: 'uploads/receipts',
+    destination: RECEIPTS_DIR,
     filename: (req, f, cb) => cb(null, crypto.randomUUID() + path.extname(f.originalname).toLowerCase()),
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -157,7 +158,7 @@ r.get('/expenses/payments/:id/receipt-file', ah(async (req, res) => {
      WHERE p.id=? AND p.tenant_id=?`, [req.params.id, req.tenantId]);
   if (!p?.receipt_path) { throw new HttpError(404, 'Sin comprobante'); }
   await assertLotAccess(req, p.lot_id);
-  res.sendFile(path.resolve('uploads/receipts', path.basename(p.receipt_path)));
+  res.sendFile(path.join(RECEIPTS_DIR, path.basename(p.receipt_path)));
 }));
 
 export default r;

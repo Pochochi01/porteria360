@@ -1,5 +1,5 @@
 // Crea el esquema y un tenant demo con usuario admin.
-import 'dotenv/config';
+import './env.js';
 import fs from 'node:fs';
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';

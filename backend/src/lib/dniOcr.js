@@ -1,7 +1,7 @@
 // OCR del DNI argentino: preprocesamiento con sharp + Tesseract + parser del texto.
 // Todo en memoria: la imagen nunca se escribe en disco.
-import path from 'node:path';
 import sharp from 'sharp';
+import { TESSERACT_CACHE } from './paths.js';
 import { createWorker } from 'tesseract.js';
 
 // ---------- Parser del texto OCR ----------
@@ -112,7 +112,7 @@ let workerPromise;
 let queue = Promise.resolve();
 const getWorker = () => {
   workerPromise ??= createWorker('spa', 1, {
-    cachePath: path.resolve('.tesseract-cache'), // el modelo de idioma se descarga una vez
+    cachePath: TESSERACT_CACHE, // el modelo de idioma se descarga una vez
     logger: () => {},
     errorHandler: () => {},
   }).catch((e) => { workerPromise = undefined; throw e; });

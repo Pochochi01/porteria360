@@ -1,5 +1,5 @@
 // Uso: npm run create:superadmin -- <email> <contraseña> ["Nombre"]
-import 'dotenv/config';
+import './env.js';
 import bcrypt from 'bcryptjs';
 import { pool, query } from './db.js';
 

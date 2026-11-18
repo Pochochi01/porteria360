@@ -1,3 +1,9 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Globs absolutos desde la carpeta de este archivo (no del cwd del build); fast-glob requiere '/'
+const here = path.dirname(fileURLToPath(import.meta.url)).split(path.sep).join('/');
+
 // Paleta "brand" en variables CSS (canales RGB): cada complejo la redefine con su color (ver src/theme/brand.js)
 const brand = Object.fromEntries(
   [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((s) => [s, `rgb(var(--brand-${s}) / <alpha-value>)`])
@@ -5,7 +11,7 @@ const brand = Object.fromEntries(
 
 export default {
   darkMode: 'class',
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  content: [`${here}/index.html`, `${here}/src/**/*.{js,jsx}`],
   theme: {
     extend: {
       colors: {

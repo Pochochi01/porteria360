@@ -1,6 +1,7 @@
 // Pruebas de integración de edición (PUT) y eliminación definitiva (DELETE).
 // Uso: npm test   (usa la base del .env; crea y borra un complejo y un superadmin de prueba)
-import 'dotenv/config';
+import '../src/lib/env.js';
+import { UPLOADS_ROOT } from '../src/lib/paths.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -263,7 +264,7 @@ test('branding: identidad, archivos, galería y página pública', async () => {
   const l1 = await up(tok.admin, 'logo');
   assert.equal(l1.status, 201);
   assert.match(l1.data.settings.logo_url, /.webp$/);
-  const f1 = path.resolve('uploads/tenants', l1.data.settings.logo_url.replace('/uploads/tenants/', ''));
+  const f1 = path.join(UPLOADS_ROOT, 'tenants', l1.data.settings.logo_url.replace('/uploads/tenants/', ''));
   assert.ok(fs.existsSync(f1));
   assert.equal((await up(tok.admin, 'logo')).status, 201);
   assert.ok(!fs.existsSync(f1), 'el logo anterior se borró del disco');
@@ -294,7 +295,7 @@ test('branding: identidad, archivos, galería y página pública', async () => {
   // Despublicar
   await call('PUT', '/branding', { token: tok.admin, body: { public_enabled: false }, expect: 200 });
   await call('GET', `/public/tenants/${SLUG}`, { expect: 404 });
-  ids.brandingDir = path.resolve('uploads/tenants', String(tenantId));
+  ids.brandingDir = path.join(UPLOADS_ROOT, 'tenants', String(tenantId));
   assert.ok(fs.existsSync(ids.brandingDir));
 });
 
@@ -362,7 +363,7 @@ test('DNI OCR – seguridad: roles, formatos, contenido real y tamaño', async (
   const big = Buffer.alloc(9 * 1024 * 1024, 1);
   assert.equal((await ocr(tok.guard, big)).status, 413, 'supera 8 MB');
   // No deja archivos temporales
-  assert.equal(fs.existsSync(path.resolve('uploads/tmp')), false);
+  assert.equal(fs.existsSync(path.join(UPLOADS_ROOT, 'tmp')), false);
 });
 
 test('DNI eventos del lector: registra sin datos personales y valida', async () => {
@@ -427,7 +428,7 @@ test('expensas · gastos: alta con comprobante privado, validaciones y acceso', 
   // El archivo es privado: no se sirve estático y solo baja con permisos
   const [asset] = await query('SELECT a.path FROM expenditures e JOIN tenant_assets a ON a.id=e.asset_id WHERE e.id=?', [fin.exp1]);
   assert.ok(asset, 'el comprobante quedó en tenant_assets');
-  fin.voucherFile = path.resolve('uploads/private', asset.path);
+  fin.voucherFile = path.join(UPLOADS_ROOT, 'private', asset.path);
   assert.ok(fs.existsSync(fin.voucherFile));
   for (const p of [`/uploads/private/${asset.path}`, `/uploads/tenants/${asset.path}`]) {
     const r = await fetch(`http://127.0.0.1:${PORT}${p}`);
@@ -465,7 +466,7 @@ test('expensas · edición y borrado de gastos (auditados, borra el archivo)', a
   const tmp = (await form('POST', '/expenditures', tok.admin, { date: '2026-02-01', category_id: fin.cat, concept: 'Temporal', amount: '10' }, { field: 'voucher', buffer: PDF, type: 'application/pdf', name: 't.pdf' })).data.id;
   const [a] = await query('SELECT a.path FROM expenditures e JOIN tenant_assets a ON a.id=e.asset_id WHERE e.id=?', [tmp]);
   await call('DELETE', `/expenditures/${tmp}`, { token: tok.admin, expect: 200 });
-  assert.ok(!fs.existsSync(path.resolve('uploads/private', a.path)), 'archivo borrado');
+  assert.ok(!fs.existsSync(path.join(UPLOADS_ROOT, 'private', a.path)), 'archivo borrado');
   const acts = (await query("SELECT action FROM audit_log WHERE tenant_id=? AND entity='expenditure'", [tenantId])).map((x) => x.action);
   for (const act of ['create', 'update', 'delete']) { assert.ok(acts.includes(act), `auditado: ${act}`); }
 });

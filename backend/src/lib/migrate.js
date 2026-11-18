@@ -177,7 +177,7 @@ export async function seedCategories(db, tenantId) {
 
 // Ejecución directa: npm run db:migrate
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await import('dotenv/config');
+  await import('./env.js');
   const { pool } = await import('./db.js');
   const done = await migrate(pool);
   console.log(done.length ? `Migración aplicada:\n - ${done.join('\n - ')}` : 'Sin cambios: la base ya estaba migrada.');

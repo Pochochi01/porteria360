@@ -115,6 +115,12 @@ export default [
     rules: { ...react.configs['jsx-runtime'].rules, 'react/jsx-uses-vars': 'error' },
   },
 
+  // ---------- CommonJS (configuración de PM2) ----------
+  {
+    files: ['**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
+  },
+
   // ---------- Node: backend, scripts, pruebas y archivos de configuración ----------
   {
     files: [

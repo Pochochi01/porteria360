@@ -25,6 +25,8 @@ Desde la raíz también se puede levantar todo junto: `npm install && npm run in
 Administrador de plataforma: `npm run create:superadmin -- <email> <clave>` (en `backend/`). Para ingresar, dejar vacío el campo "Complejo".
 
 ## Producción
+Guía completa para **Hostinger VPS (porteria360.net)**: DNS, SSL, Nginx, PM2 y MercadoPago en [docs/deploy-hostinger.md](docs/deploy-hostinger.md). Archivos: `backend/.env.production.example`, `deploy/nginx/porteria360.net.conf`, `deploy/ecosystem.config.cjs`.
+
 ```bash
 npm run build      # compila la PWA en frontend/dist
 npm start          # NODE_ENV=production: Express sirve el API y la PWA en el mismo puerto
