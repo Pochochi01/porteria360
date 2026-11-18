@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { query } from '../lib/db.js';
 import { ah, audit, validate, HttpError, nowSql, toSql, parseSql } from '../lib/helpers.js';
 import { requireRole, hasRole } from '../middleware/auth.js';
-import { emitToRoles, emitToUser, pushToUsers, lotUserIds } from '../lib/realtime.js';
+import { emitToRoles, emitToUser, lotUserIds } from '../lib/realtime.js';
+import { publish } from '../notifications/events.js';
 
 const r = Router();
 const RESIDENT = ['owner', 'family', 'resident'];
@@ -79,7 +80,7 @@ r.post('/visits/request', requireRole(...GUARD),
     const visit = await getVisit(req, x.insertId);
     const users = await lotUserIds(req.tenantId, b.lot_id);
     users.forEach((u) => emitToUser(u, 'visit:request', visit));
-    await pushToUsers(req.tenantId, users, { title: 'Visita en guardia', body: `${b.visitor_name} solicita ingresar`, url: '/visitas', urgent: true });
+    publish('visit.requested', { tenantId: req.tenantId, visit, actorId: req.user.id });
     await audit(req, 'visit', x.insertId, 'requested', b);
     res.status(201).json(visit);
   }));
@@ -93,6 +94,7 @@ r.post('/visits/:id/decision', requireRole(...RESIDENT), validate(z.object({ app
   await query('UPDATE visits SET status=?, authorized_by=?, authorized_at=? WHERE id=?', [status, req.user.id, nowSql(), v.id]);
   const updated = await getVisit(req, v.id);
   emitToRoles(req.tenantId, GUARD, 'visit:updated', updated);
+  publish('visit.decided', { tenantId: req.tenantId, visit: updated, actorId: req.user.id });
   await audit(req, 'visit', v.id, status);
   res.json(updated);
 }));
@@ -105,6 +107,7 @@ r.post('/visits/:id/entry', requireRole(...GUARD), ah(async (req, res) => {
   const updated = await getVisit(req, v.id);
   (await lotUserIds(req.tenantId, v.lot_id)).forEach((u) => emitToUser(u, 'visit:updated', updated));
   emitToRoles(req.tenantId, GUARD, 'visit:updated', updated);
+  publish('visit.entered', { tenantId: req.tenantId, visit: updated, actorId: req.user.id });
   await audit(req, 'visit', v.id, 'entry');
   res.json(updated);
 }));
@@ -114,7 +117,9 @@ r.post('/visits/:id/exit', requireRole(...GUARD), ah(async (req, res) => {
   if (v.status !== 'inside') { throw new HttpError(409, 'La visita no está adentro'); }
   await query("UPDATE visits SET status='exited', exit_at=?, exit_guard_id=? WHERE id=?", [nowSql(), req.user.id, v.id]);
   const updated = await getVisit(req, v.id);
+  (await lotUserIds(req.tenantId, v.lot_id)).forEach((u) => emitToUser(u, 'visit:updated', updated));
   emitToRoles(req.tenantId, GUARD, 'visit:updated', updated);
+  publish('visit.exited', { tenantId: req.tenantId, visit: updated, actorId: req.user.id });
   await audit(req, 'visit', v.id, 'exit');
   res.json(updated);
 }));

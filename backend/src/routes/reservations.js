@@ -4,6 +4,7 @@ import { query, tx } from '../lib/db.js';
 import { ah, audit, validate, HttpError, toSql } from '../lib/helpers.js';
 import { requireRole, hasRole } from '../middleware/auth.js';
 import { emitToUser } from '../lib/realtime.js';
+import { publish } from '../notifications/events.js';
 
 const r = Router();
 const ADMIN = ['admin'];
@@ -117,6 +118,7 @@ r.post('/reservations/:id/review', requireRole(...ADMIN),
     const status = req.body.approve ? 'approved' : 'rejected';
     await query('UPDATE reservations SET status=?, reviewed_by=?, review_note=? WHERE id=?', [status, req.user.id, req.body.note ?? null, rv.id]);
     emitToUser(rv.user_id, 'reservation:updated', { id: rv.id, status });
+    if (status === 'approved') { publish('reservation.confirmed', { tenantId: req.tenantId, reservation: rv, actorId: req.user.id }); }
     await audit(req, 'reservation', rv.id, status, req.body);
     res.json({ ok: true });
   }));
@@ -126,6 +128,7 @@ r.post('/reservations/:id/cancel', ah(async (req, res) => {
   if (!rv) { throw new HttpError(404, 'Reserva no encontrada'); }
   if (!hasRole(req, ...ADMIN) && rv.lot_id !== req.user.lot_id) { throw new HttpError(403, 'Permiso denegado'); }
   await query("UPDATE reservations SET status='cancelled' WHERE id=?", [rv.id]);
+  publish('reservation.cancelled', { tenantId: req.tenantId, reservation: rv, actorId: req.user.id }); // a quien la hizo, si la canceló otro
   await audit(req, 'reservation', rv.id, 'cancelled');
   res.json({ ok: true });
 }));

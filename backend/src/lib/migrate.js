@@ -89,6 +89,66 @@ const TABLES = [
     sort_order INT NOT NULL DEFAULT 0,
     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
   )`,
+  // ===== Notificaciones =====
+  // Historial y cola de envío a la vez: cada fila es una notificación para UN usuario.
+  // La cola es la propia tabla (persistente: sobrevive a reinicios y caídas).
+  `CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    user_id INT NOT NULL,
+    type VARCHAR(60) NOT NULL,
+    category VARCHAR(20) NOT NULL,
+    source_module VARCHAR(30) NOT NULL,
+    priority ENUM('normal','high') NOT NULL DEFAULT 'normal',
+    title VARCHAR(160) NOT NULL,
+    body VARCHAR(500) NOT NULL,
+    action_url VARCHAR(255) NOT NULL DEFAULT '/',
+    action_label VARCHAR(40) NULL,
+    image_url VARCHAR(255) NULL,
+    entity_type VARCHAR(30) NULL,
+    entity_id BIGINT NULL,
+    dedupe_key VARCHAR(120) NULL,
+    status ENUM('queued','sending','sent','partial','failed','no_devices') NOT NULL DEFAULT 'queued',
+    attempts TINYINT NOT NULL DEFAULT 0,
+    next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lock_id CHAR(16) NULL,
+    locked_at DATETIME NULL,
+    device_count SMALLINT NOT NULL DEFAULT 0,
+    delivered_count SMALLINT NOT NULL DEFAULT 0,
+    delivered_to JSON NULL,
+    last_error VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at DATETIME NULL,
+    read_at DATETIME NULL,
+    UNIQUE KEY uq_notif_dedupe (user_id, dedupe_key),
+    INDEX ix_notif_queue (status, next_attempt_at),
+    INDEX ix_notif_user (tenant_id, user_id, created_at),
+    INDEX ix_notif_tenant (tenant_id, created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+  // Preferencias por usuario. Sin fila = valores por defecto según el rol (ver notifications/preferences.js)
+  `CREATE TABLE IF NOT EXISTS notification_preferences (
+    user_id INT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    categories JSON NOT NULL,
+    reminders JSON NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+  // Comunicados del complejo y mensajes de la administración
+  `CREATE TABLE IF NOT EXISTS announcements (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    kind ENUM('announcement','message') NOT NULL DEFAULT 'announcement',
+    audience ENUM('all','owners','residents','staff','user') NOT NULL DEFAULT 'all',
+    target_user_id INT NULL,
+    title VARCHAR(160) NOT NULL,
+    body TEXT NOT NULL,
+    created_by INT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX ix_ann_tenant (tenant_id, created_at),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+  )`,
 ];
 
 // [tabla, columna, definición]
@@ -105,6 +165,23 @@ const COLUMNS = [
   ['expense_settlements', 'breakdown', 'JSON NULL'],
   ['expense_payments', 'mp_payment_id', 'VARCHAR(40) NULL'],
   ['tenant_assets', 'private', 'TINYINT(1) NOT NULL DEFAULT 0'],
+  // Dispositivos registrados (push_subscriptions): varios por usuario, Web Push o FCM
+  ['push_subscriptions', 'channel', "ENUM('webpush','fcm') NOT NULL DEFAULT 'webpush'"],
+  ['push_subscriptions', 'fcm_token', 'VARCHAR(255) NULL'],
+  ['push_subscriptions', 'platform', 'VARCHAR(20) NULL'],
+  ['push_subscriptions', 'browser', 'VARCHAR(40) NULL'],
+  ['push_subscriptions', 'device', 'VARCHAR(60) NULL'],
+  ['push_subscriptions', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP'],
+  ['push_subscriptions', 'updated_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'],
+  ['push_subscriptions', 'last_seen', 'DATETIME NULL'],
+];
+
+// Columnas que pasan a aceptar NULL: [tabla, columna, definición completa]
+// (un dispositivo FCM no tiene endpoint ni claves de Web Push)
+const NULLABLE = [
+  ['push_subscriptions', 'endpoint', 'VARCHAR(500) NULL'],
+  ['push_subscriptions', 'p256dh', 'VARCHAR(200) NULL'],
+  ['push_subscriptions', 'auth', 'VARCHAR(100) NULL'],
 ];
 
 // Valores nuevos en ENUM existentes: [tabla, columna, definición completa]
@@ -116,6 +193,8 @@ const ENUMS = [
 const INDEXES = [
   ['expense_payments', 'uq_mp_payment', 'CREATE UNIQUE INDEX uq_mp_payment ON expense_payments (mp_payment_id)'],
   ['expense_settlements', 'ix_settle_run', 'CREATE INDEX ix_settle_run ON expense_settlements (run_id)'],
+  ['push_subscriptions', 'uq_push_fcm', 'CREATE UNIQUE INDEX uq_push_fcm ON push_subscriptions (fcm_token)'],
+  ['push_subscriptions', 'ix_push_user', 'CREATE INDEX ix_push_user ON push_subscriptions (tenant_id, user_id)'],
 ];
 
 /**
@@ -146,6 +225,13 @@ export async function migrate(db) {
     if (col && col.column_type.toLowerCase() !== wanted) {
       await db.query(`ALTER TABLE ${table} MODIFY COLUMN ${column} ${def}`);
       done.push(`${table}.${column} (valores)`);
+    }
+  }
+  for (const [table, column, def] of NULLABLE) {
+    const [[col]] = await db.query('SELECT is_nullable AS n FROM information_schema.columns WHERE table_schema=? AND table_name=? AND column_name=?', [dbName, table, column]);
+    if (col && col.n === 'NO') {
+      await db.query(`ALTER TABLE ${table} MODIFY COLUMN ${column} ${def}`);
+      done.push(`${table}.${column} (acepta NULL)`);
     }
   }
   for (const [table, name, sql] of INDEXES) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
-import { syncPush } from './push';
+import { syncPush, unlinkPush } from './push';
 import { AuthCtx } from './auth';
 
 /**
@@ -49,7 +49,8 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', data.token);
     setUser(data.user);
   };
-  const logout = () => {
+  const logout = async () => {
+    await unlinkPush(); // este dispositivo deja de recibir los avisos de esta cuenta (con el token todavía válido)
     localStorage.removeItem('token');
     localStorage.removeItem('platformToken');
     setUser(null);

@@ -9,7 +9,7 @@ import { requireRole, hasRole } from '../middleware/auth.js';
 import { DOCUMENT_MIME, LIMITS, removeAsset, sendAsset, storeAsset } from '../lib/files.js';
 import { computeSettlements, EngineError, METHODS } from '../lib/expenseEngine.js';
 import { sendReport } from '../lib/exporter.js';
-import { pushToUsers } from '../lib/realtime.js';
+import { publish } from '../notifications/events.js';
 import { PAYMENT_TYPES, VOUCHER_TYPES, dataSchemaFor, zCuit } from '../models/finance.js';
 import { zDate, zOptText } from '../lib/crud.js';
 
@@ -298,11 +298,9 @@ r.post('/expense-runs', requireRole(...ADMIN), validate(runSchema), ah(async (re
     return { run_id: ins.insertId, created, updated, skipped, locked: locked.length };
   });
   await audit(req, 'expense_run', result.run_id, 'generate', { period: b.period, method: b.method, total: run.total, ...result });
-  // Aviso a los propietarios (push); sin bloquear la respuesta
-  const users = await query(
-    `SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles ro ON ro.id=ur.role_id
-     WHERE u.tenant_id=? AND u.active=1 AND ro.name IN ('owner','family')`, [req.tenantId]);
-  pushToUsers(req.tenantId, users.map((u) => u.id), { title: 'Nueva expensa', body: `Ya está disponible la expensa de ${b.period}`, url: '/expensas' }).catch(() => {});
+  // Aviso a los responsables de cada lote liquidado (en segundo plano)
+  const lots = await query('SELECT DISTINCT lot_id FROM expense_settlements WHERE run_id=? AND tenant_id=?', [result.run_id, req.tenantId]);
+  publish('expenses.published', { tenantId: req.tenantId, runId: result.run_id, period: b.period, lotIds: lots.map((l) => l.lot_id), actorId: req.user.id });
   res.status(201).json({ ...result, total: run.total });
 }));
 

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { query } from '../lib/db.js';
 import { ah, validate } from '../lib/helpers.js';
 import { authenticate, signToken } from '../middleware/auth.js';
+import { registerDevice } from './notifications.js';
 
 const r = Router();
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20 });
@@ -58,16 +59,8 @@ r.get(
 r.post(
   '/push-subscription',
   authenticate,
-  validate(z.object({ endpoint: z.string().url(), keys: z.object({ p256dh: z.string(), auth: z.string() }) })),
-  ah(async (req, res) => {
-    const { endpoint, keys } = req.body;
-    await query(
-      `INSERT INTO push_subscriptions (tenant_id,user_id,endpoint,p256dh,auth) VALUES (?,?,?,?,?)
-       ON DUPLICATE KEY UPDATE user_id=VALUES(user_id), tenant_id=VALUES(tenant_id), p256dh=VALUES(p256dh), auth=VALUES(auth)`,
-      [req.tenantId, req.user.id, endpoint, keys.p256dh, keys.auth]
-    );
-    res.status(201).json({ ok: true });
-  })
+  validate(z.object({ endpoint: z.string().url().max(500), keys: z.object({ p256dh: z.string().max(200), auth: z.string().max(100) }), platform: z.string().max(20).optional() })),
+  registerDevice // mismo servicio que POST /api/notifications/devices
 );
 
 r.get('/vapid-key', (req, res) => res.json({ key: process.env.VAPID_PUBLIC_KEY || null }));

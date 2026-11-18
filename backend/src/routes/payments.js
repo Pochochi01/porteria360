@@ -5,6 +5,7 @@ import { query, tx } from '../lib/db.js';
 import { ah, audit, HttpError } from '../lib/helpers.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { emitToUser } from '../lib/realtime.js';
+import { publish } from '../notifications/events.js';
 import { assertLotAccess } from '../lib/ownership.js';
 
 const MP = process.env.MP_API_BASE || 'https://api.mercadopago.com';
@@ -101,6 +102,8 @@ publicPayments.post('/webhook', ah(async (req, res) => {
     "INSERT INTO audit_log (tenant_id,entity,entity_id,action,data) VALUES (?,'reservation',?,'mp_webhook',?)",
     [tenantId, rv.id, JSON.stringify({ payment_id: payment.id, status: payment.status })]);
   emitToUser(rv.user_id, 'reservation:updated', { id: rv.id, payment_status: status });
+  // Pago acreditado de una reserva ya aprobada: queda confirmada (el dedupe evita repetir el aviso)
+  if (status === 'approved' && rv.status === 'approved') { publish('reservation.confirmed', { tenantId, reservation: rv }); }
   res.sendStatus(200);
 }));
 

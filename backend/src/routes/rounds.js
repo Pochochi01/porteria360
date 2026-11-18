@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { query, tx } from '../lib/db.js';
 import { ah, audit, validate, HttpError, nowSql } from '../lib/helpers.js';
 import { requireRole } from '../middleware/auth.js';
-import { emitToRoles, pushToRoles } from '../lib/realtime.js';
+import { emitToRoles } from '../lib/realtime.js';
+import { publish } from '../notifications/events.js';
 
 const r = Router();
 const SUP = ['supervisor', 'admin'];
@@ -104,7 +105,7 @@ r.get('/rounds', requireRole(...SUP), ah(async (req, res) => {
 async function raiseAlert(tenantId, round, message) {
   const alert = { round_id: round.id, guard_name: round.guard_name, message, at: new Date().toISOString() };
   emitToRoles(tenantId, SUP, 'round:alert', alert);
-  await pushToRoles(tenantId, SUP, { title: 'Alerta de ronda', body: message, url: '/rondas', urgent: true });
+  publish('round.alert', { tenantId, round, message });
 }
 
 /** Job periódico: rondas que superaron el tiempo esperado → incompletas + alerta. */

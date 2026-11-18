@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { query } from '../lib/db.js';
 import { ah, audit, validate, HttpError, nowSql } from '../lib/helpers.js';
 import { requireRole, hasRole } from '../middleware/auth.js';
-import { emitToRoles, emitToUser, pushToRoles } from '../lib/realtime.js';
+import { emitToRoles, emitToUser } from '../lib/realtime.js';
+import { publish } from '../notifications/events.js';
 
 const r = Router();
-const RESPONDERS = ['guard', 'supervisor'];
 const STAFF = ['guard', 'supervisor', 'admin'];
 const rateMap = new Map();
 
@@ -36,10 +36,7 @@ r.post('/incidents',
       [req.tenantId, b.type, req.user.id, req.user.lot_id ?? null, b.lat ?? null, b.lng ?? null, b.description ?? null]);
     const inc = await getIncident(req, x.insertId);
     emitToRoles(req.tenantId, STAFF, 'incident:new', inc);
-    const label = b.type === 'medical' ? '🚑 EMERGENCIA MÉDICA' : '🚨 EMERGENCIA DE SEGURIDAD';
-    await pushToRoles(req.tenantId, RESPONDERS, {
-      title: label, body: `Lote ${inc.lot_code || '-'} · ${inc.reporter}`, url: `/emergencias`, urgent: true, tag: `inc-${inc.id}`,
-    });
+    publish('incident.created', { tenantId: req.tenantId, incident: inc, actorId: req.user.id });
     await audit(req, 'incident', inc.id, 'created', b);
     res.status(201).json(inc);
   }));

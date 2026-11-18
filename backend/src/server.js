@@ -27,6 +27,8 @@ import financeRoutes from './routes/finance.js';
 import ownerPortalRoutes from './routes/ownerPortal.js';
 import { pool } from './lib/db.js';
 import { shutdownOcr } from './lib/dniOcr.js';
+import notificationRoutes, { publicNotifications } from './routes/notifications.js';
+import { startNotifications, stopNotifications } from './notifications/index.js';
 
 fs.mkdirSync(RECEIPTS_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS, { recursive: true });
@@ -59,6 +61,7 @@ app.use('/uploads/tenants', express.static(UPLOADS, {
 }));
 app.use('/api/pagos', publicPayments); // webhook + OAuth callback (sin JWT)
 app.use('/api/pagos', payments);
+app.use('/api', publicNotifications); // lectura informada por el service worker (firmada, sin JWT)
 
 // Todo lo siguiente exige JWT y queda aislado por req.tenantId
 const api = express.Router();
@@ -69,6 +72,7 @@ api.use(brandingRoutes);
 api.use(dniRoutes); // lectura de DNI (OCR) para la guardia
 api.use(financeRoutes, ownerPortalRoutes); // expensas: gastos, liquidación, transparencia y portal del propietario
 api.use(userRoutes, accessRoutes, roundRoutes, expenseRoutes, reservationRoutes, emergencyRoutes);
+api.use(notificationRoutes); // bandeja, dispositivos, preferencias, comunicados y panel
 app.use('/api', api);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
@@ -135,7 +139,10 @@ server.on('error', (e) => {
 });
 // HOST=127.0.0.1 en producción: solo accesible a través de Nginx (sin HOST escucha en todas las interfaces)
 const host = process.env.HOST || undefined;
-server.listen(port, host, () => console.log(`API en http://${host || '0.0.0.0'}:${port} (${process.env.NODE_ENV || 'development'})`));
+server.listen(port, host, () => {
+  console.log(`API en http://${host || '0.0.0.0'}:${port} (${process.env.NODE_ENV || 'development'})`);
+  startNotifications();
+});
 
 // Apagado ordenado (Ctrl+C, docker stop, PM2, systemd): termina lo pendiente y libera recursos
 let closing = false;
@@ -148,6 +155,7 @@ async function shutdown(signal) {
   force.unref();
   io.close();
   await new Promise((resolve) => { server.close(resolve); });
+  await stopNotifications(); // termina el lote en curso antes de cerrar MySQL
   await Promise.allSettled([pool.end(), shutdownOcr()]);
   process.exit(0);
 }

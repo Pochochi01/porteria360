@@ -41,7 +41,7 @@ export default defineModel({
     await c.execute(`DELETE rp FROM round_points rp JOIN rounds r ON r.id=rp.round_id WHERE r.${T}`, [id]);
     for (const t of ['tenant_settings', 'tenant_gallery', 'tenant_assets']) { await c.execute(`DELETE FROM ${t} WHERE ${T}`, [id]); }
     for (const t of ['rounds', 'guards', 'checkpoints', 'expense_payments', 'expense_settlements', 'expenditures', 'expense_runs', 'payment_methods', 'suppliers', 'expense_categories', 'reservations', 'spaces',
-      'visits', 'incidents', 'push_subscriptions', 'audit_log']) { await c.execute(`DELETE FROM ${t} WHERE ${T}`, [id]); }
+      'visits', 'incidents', 'notifications', 'notification_preferences', 'announcements', 'push_subscriptions', 'audit_log']) { await c.execute(`DELETE FROM ${t} WHERE ${T}`, [id]); }
     await c.execute(`UPDATE users SET parent_user_id=NULL WHERE ${T}`, [id]);
     await c.execute(`DELETE FROM users WHERE ${T}`, [id]); // user_roles cae por ON DELETE CASCADE
     await c.execute(`DELETE FROM lots WHERE ${T}`, [id]);

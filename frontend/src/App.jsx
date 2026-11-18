@@ -5,6 +5,7 @@ import { api } from './lib/api';
 import { brandStyle } from './theme/brand';
 import { ThemeToggle } from './components/ThemeToggle';
 import { homeFor } from './lib/roleHome';
+import { useServiceWorkerNavigation, useUnreadNotifications } from './hooks/useNotifications';
 
 // Invitación a instalar y a activar notificaciones: chunk propio, fuera del camino crítico
 const AppPrompts = lazy(() => import('./components/AppPrompts').then((m) => ({ default: m.AppPrompts })));
@@ -24,8 +25,11 @@ const Expenses = lazy(() => import('./pages/Expenses'));
 const Reservations = lazy(() => import('./pages/Reservations'));
 const Emergencies = lazy(() => import('./pages/Emergencies'));
 const Platform = lazy(() => import('./pages/Platform'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Announcements = lazy(() => import('./pages/Announcements'));
 
 const RES = ['owner', 'family', 'resident'];
+const EVERYONE = ['admin', 'supervisor', 'guard', ...RES];
 const MENU = [
   { to: '/plataforma', label: 'Complejos', roles: ['superadmin'], only: true, el: <Platform /> },
   { to: '/admin', label: 'Usuarios', roles: ['admin'], el: <AdminUsers /> },
@@ -38,6 +42,8 @@ const MENU = [
   { to: '/expensas', label: 'Expensas', roles: ['admin', 'owner', 'family'], el: <Expenses /> },
   { to: '/reservas', label: 'Reservas', roles: ['admin', ...RES], el: <Reservations /> },
   { to: '/emergencias', label: 'Emergencias', roles: ['admin', 'supervisor', 'guard', ...RES], el: <Emergencies /> },
+  { to: '/comunicados', label: 'Comunicados', roles: EVERYONE, el: <Announcements /> },
+  { to: '/notificaciones', label: 'Notificaciones', roles: EVERYONE, el: <Notifications />, badge: 'unread' },
 ];
 
 const Loading = () => (
@@ -51,6 +57,8 @@ const Loading = () => (
 function AppShell() {
   const { user, logout, is, inTenant, backToPlatform } = useAuth();
   const [brand, setBrand] = useState(null);
+  const unread = useUnreadNotifications();
+  useServiceWorkerNavigation();
 
   useEffect(() => {
     api.get('/branding/current').then((r) => setBrand(r.data)).catch(() => {});
@@ -83,6 +91,11 @@ function AppShell() {
               className={({ isActive }) => `touch-target flex items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                 isActive ? 'bg-black/25 font-medium dark:bg-white/10' : 'text-white/85 hover:bg-white/10'}`}>
               {m.label}
+              {m.badge === 'unread' && unread > 0 && (
+                <span className="ml-1.5 rounded-full bg-amber-400 px-1.5 text-[11px] font-bold leading-5 text-slate-900">
+                  {unread > 99 ? '99+' : unread}<span className="sr-only"> sin leer</span>
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
