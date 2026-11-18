@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import { api, errMsg } from '../lib/api';
 import { useSocketEvent } from '../lib/auth';
-import { Alert, Field, PageTitle, Status } from '../components/ui';
-import { fmtDate } from '../lib/format';
+import { Alert, Field, PageTitle } from '../components/ui';
 import { useFetch } from '../hooks/useFetch';
 import { useForm } from '../hooks/useForm';
+import { VisitsPanel } from '../components/VisitsPanel';
+import { QrShareCard } from '../components/QrShareCard';
 
 const local = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
@@ -50,9 +50,6 @@ export default function ResidentVisits() {
     }
   };
 
-  const share = () =>
-    navigator.share?.({ title: 'Acceso al country', text: `QR de acceso para ${qr.visitor_name}: ${qr.token}` });
-
   const pending = visits.data?.filter((v) => v.status === 'pending') || [];
 
   return (
@@ -63,10 +60,10 @@ export default function ResidentVisits() {
       {pending.map((v) => (
         <div key={v.id} className="card animate-pulse border-2 border-amber-400">
           <div className="font-semibold">🔔 {v.visitor_name} está en la guardia</div>
-          <p className="text-sm text-slate-600">DNI {v.visitor_dni} {v.vehicle_plate && `· ${v.vehicle_plate}`} {v.notes && `· ${v.notes}`}</p>
-          <div className="mt-3 flex gap-2">
-            <button className="btn-primary" onClick={() => decide(v, true)}>Autorizar</button>
-            <button className="btn-danger" onClick={() => decide(v, false)}>Rechazar</button>
+          <p className="text-sm text-slate-600 dark:text-slate-300">DNI {v.visitor_dni} {v.vehicle_plate && `· ${v.vehicle_plate}`} {v.notes && `· ${v.notes}`}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:flex">
+            <button className="btn-primary min-h-11" onClick={() => decide(v, true)}>Autorizar</button>
+            <button className="btn-danger min-h-11" onClick={() => decide(v, false)}>Rechazar</button>
           </div>
         </div>
       ))}
@@ -79,36 +76,17 @@ export default function ResidentVisits() {
             <Field label="DNI"><input className="input" {...f.bind('visitor_dni')} /></Field>
             <Field label="Patente"><input className="input uppercase" {...f.bind('vehicle_plate')} /></Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Desde"><input type="datetime-local" className="input" required {...f.bind('valid_from')} /></Field>
             <Field label="Hasta"><input type="datetime-local" className="input" required {...f.bind('valid_until')} /></Field>
           </div>
-          <button className="btn-primary w-full">Generar QR</button>
+          <button className="btn-primary min-h-11 w-full">Generar QR</button>
         </form>
 
-        {qr && (
-          <div className="card flex flex-col items-center gap-3 text-center">
-            <QRCodeSVG value={qr.token} size={220} />
-            <div className="font-medium">{qr.visitor_name}</div>
-            <div className="text-xs text-slate-500">Válido {fmtDate(qr.valid_from)} — {fmtDate(qr.valid_until)}</div>
-            {navigator.share && <button className="btn-secondary" onClick={share}>Compartir</button>}
-          </div>
-        )}
+        {qr && <QrShareCard qr={qr} />}
       </div>
 
-      <div className="card overflow-x-auto">
-        <table className="table">
-          <thead><tr><th>Visitante</th><th>Método</th><th>Estado</th><th>Entrada</th><th>Salida</th></tr></thead>
-          <tbody>
-            {visits.data?.map((v) => (
-              <tr key={v.id}>
-                <td>{v.visitor_name}</td><td>{v.auth_method === 'qr' ? 'QR' : 'En guardia'}</td>
-                <td><Status s={v.status} /></td><td>{fmtDate(v.entry_at)}</td><td>{fmtDate(v.exit_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <VisitsPanel visits={visits.data} loading={!visits.data && !visits.error} />
     </div>
   );
 }

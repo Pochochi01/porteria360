@@ -4,6 +4,10 @@ import { useAuth } from './lib/auth';
 import { api } from './lib/api';
 import { brandStyle } from './theme/brand';
 import { ThemeToggle } from './components/ThemeToggle';
+import { homeFor } from './lib/roleHome';
+
+// Invitación a instalar y a activar notificaciones: chunk propio, fuera del camino crítico
+const AppPrompts = lazy(() => import('./components/AppPrompts').then((m) => ({ default: m.AppPrompts })));
 
 // Code splitting: cada pantalla es un chunk propio
 const LandingPage = lazy(() => import('./landing/LandingPage'));
@@ -58,9 +62,10 @@ function AppShell() {
   // Superadmin en la plataforma: solo ve "Complejos"; dentro de un complejo, el menú de admin
   const items = MENU.filter((m) => is(...m.roles) && (inTenant ? !m.only : !is('superadmin') || m.only));
   const s = brand?.settings;
+  const home = homeFor(user.roles, items.map((m) => m.to));
 
   return (
-    <div className="min-h-screen md:flex" style={brandStyle(s)}>
+    <div className="min-h-screen overflow-x-clip md:flex" style={brandStyle(s)}>
       <aside className="bg-brand-800 text-white md:sticky md:top-0 md:h-screen md:w-60 md:shrink-0 dark:bg-slate-900 dark:md:border-r dark:md:border-white/10">
         <div className="flex items-center justify-between gap-2 p-4">
           <span className="flex min-w-0 items-center gap-2 font-display font-bold">
@@ -69,13 +74,13 @@ function AppShell() {
           </span>
           <span className="flex items-center gap-2 md:hidden">
             <ThemeToggle className="!h-8 !w-8 border-white/20 bg-white/10 text-white" />
-            <button onClick={logout} className="text-xs underline">Salir</button>
+            <button onClick={logout} className="touch-target px-1 text-xs underline">Salir</button>
           </span>
         </div>
         <nav aria-label="Panel" className="no-scrollbar flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:overflow-visible">
           {items.map((m) => (
             <NavLink key={m.to} to={m.to}
-              className={({ isActive }) => `whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
+              className={({ isActive }) => `touch-target flex items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                 isActive ? 'bg-black/25 font-medium dark:bg-white/10' : 'text-white/85 hover:bg-white/10'}`}>
               {m.label}
             </NavLink>
@@ -89,7 +94,8 @@ function AppShell() {
           <button onClick={logout} className="underline">Cerrar sesión</button>
         </div>
       </aside>
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4">
+      {/* min-w-0: una tabla ancha hace scroll dentro de su tarjeta, nunca ensancha la página */}
+      <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 p-4 pb-safe">
         {inTenant && (
           <div className="mb-4 flex items-center justify-between rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
             Estás administrando un complejo como superadmin.
@@ -99,10 +105,12 @@ function AppShell() {
         <Suspense fallback={<Loading />}>
           <Routes>
             {items.map((m) => <Route key={m.to} path={m.to} element={m.el} />)}
-            <Route path="*" element={<Navigate to={items[0]?.to || '/'} replace />} />
+            {/* /panel (inicio de sesión y app instalada) y rutas desconocidas → pantalla inicial del perfil */}
+            <Route path="*" element={<Navigate to={home} replace />} />
           </Routes>
         </Suspense>
       </main>
+      <Suspense fallback={null}><AppPrompts /></Suspense>
     </div>
   );
 }

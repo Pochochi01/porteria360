@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
-import { registerPush } from './push';
+import { syncPush } from './push';
 import { AuthCtx } from './auth';
 
 /**
@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
       });
       setSocket(s);
     });
-    registerPush().catch(() => {});
+    syncPush().catch(() => {}); // solo renueva si ya hay permiso: nunca pide permiso sin un gesto del usuario
     return () => { cancelled = true; s?.disconnect(); };
   }, [user]);
 

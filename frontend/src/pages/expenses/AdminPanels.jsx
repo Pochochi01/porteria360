@@ -21,7 +21,7 @@ export function ExpenseDashboard({ period, onPeriod }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PeriodSelect value={period} onChange={onPeriod} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" className="btn-secondary" onClick={() => exportCollections('pdf')}><Icon name="file" className="h-4 w-4" />Cobranza PDF</button>
           <button type="button" className="btn-secondary" onClick={() => exportCollections('xlsx')}><Icon name="grid" className="h-4 w-4" />Cobranza Excel</button>
         </div>

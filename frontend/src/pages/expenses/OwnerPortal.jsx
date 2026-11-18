@@ -110,7 +110,7 @@ export function OwnerAccount({ onPaid }) {
           <h2 className="font-semibold">Informar transferencia · {paying.period} · Lote {paying.lot_code}</h2>
           <p className="text-sm">Importe a transferir: <b>{money(paying.amount)}</b> <span className="text-xs text-slate-500">(no se aceptan pagos parciales)</span></p>
           <input type="file" accept="image/*,application/pdf" required onChange={(e) => setFile(e.target.files[0])} className="text-sm" />
-          <div className="flex gap-2"><button className="btn-primary">Enviar comprobante</button><button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancelar</button></div>
+          <div className="flex flex-wrap gap-2"><button className="btn-primary">Enviar comprobante</button><button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancelar</button></div>
         </form>
       )}
 

@@ -5,6 +5,7 @@ import { AuthProvider } from './lib/AuthProvider';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { applyInitialTheme } from './theme/theme';
 import App from './App';
+import './lib/pwa'; // captura beforeinstallprompt antes de que React monte
 import './index.css';
 
 applyInitialTheme(); // antes del primer render: sin destello claro→oscuro

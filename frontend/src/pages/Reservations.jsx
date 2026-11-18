@@ -101,7 +101,7 @@ export default function Reservations() {
       )}
 
       <div className="card space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Espacio">
             <select className="input" value={spaceId} onChange={(e) => setSpaceId(e.target.value)}>
               {spaces.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}

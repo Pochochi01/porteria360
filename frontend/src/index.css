@@ -49,6 +49,10 @@
     transition: transform 160ms var(--ease-out), background-color 150ms ease, box-shadow 200ms ease;
   }
   .btn:active:not(:disabled) { transform: scale(0.97); }
+  /* Pantallas táctiles: áreas de toque de al menos 44px (WCAG 2.5.5 / guías de iOS y Android) */
+  @media (pointer: coarse) {
+    .btn, .input, .touch-target { min-height: 2.75rem; }
+  }
   .btn-primary { @apply btn bg-brand-700 text-brand-on hover:bg-brand-800; }
   .btn-secondary { @apply btn border border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800; }
   .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
