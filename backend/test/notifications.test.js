@@ -8,7 +8,7 @@ import { toSql } from '../src/lib/helpers.js';
 import { TEMPLATES, render } from '../src/notifications/templates.js';
 import { defaultsFor, get as getPrefs, update as updatePrefs } from '../src/notifications/preferences.js';
 import { describeAgent, register } from '../src/notifications/subscriptions.js';
-import { buildPayload, checkReadToken, readToken } from '../src/notifications/dispatcher.js';
+import { buildPayload, checkReadToken, readToken, urgencyOf } from '../src/notifications/dispatcher.js';
 import { providers } from '../src/notifications/providers.js';
 import { notify } from '../src/notifications/service.js';
 import { handle } from '../src/notifications/events.js';
@@ -94,6 +94,14 @@ test('firma de lectura del service worker', () => {
   assert.equal(p.urgent, true);
   assert.equal(p.badge, '/badge-72.png');
   assert.equal(p.tag, 'x:9');
+});
+
+test('urgencia de entrega: accesos y seguridad inmediatos (Doze); informativos normales', () => {
+  assert.equal(urgencyOf({ priority: 'normal', category: 'access' }), 'high');
+  assert.equal(urgencyOf({ priority: 'normal', category: 'visits' }), 'high');
+  assert.equal(urgencyOf({ priority: 'high', category: 'expenses' }), 'high');
+  assert.equal(urgencyOf({ priority: 'normal', category: 'expenses' }), 'normal');
+  assert.equal(urgencyOf({ priority: 'normal', category: 'announcements' }), 'normal');
 });
 
 test('preferencias: defaults por rol, emergencias bloqueadas para el personal, valores inválidos ignorados', async () => {

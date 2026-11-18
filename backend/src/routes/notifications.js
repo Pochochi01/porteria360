@@ -133,8 +133,16 @@ r.delete('/announcements/:id', requireRole(...ADMIN), ah(async (req, res) => {
 
 export default r;
 
-// ----- Público (sin sesión): lectura informada por el service worker al tocar la notificación -----
+// ----- Público (sin sesión): llamadas del service worker -----
 export const publicNotifications = Router();
+publicNotifications.post('/notifications/devices/rotate',
+  validate(z.object({ oldEndpoint: z.string().url().max(500), subscription: z.object({ endpoint: z.string().url().max(500), keys: z.object({ p256dh: z.string().max(200), auth: z.string().max(100) }) }) })),
+  ah(async (req, res) => {
+    // Sin coincidencia responde igual (204): no revela qué endpoints existen
+    await devices.rotate(req.body.oldEndpoint, req.body.subscription).catch(() => {});
+    res.status(204).end();
+  }));
+// Lectura informada al tocar la notificación
 publicNotifications.post('/notifications/receipt', validate(z.object({ id: z.number().int().positive(), rt: z.string().max(40) })), ah(async (req, res) => {
   if (!checkReadToken(req.body.id, req.body.rt)) { throw new HttpError(403, 'Firma inválida'); }
   await repo.markReadById(req.body.id);

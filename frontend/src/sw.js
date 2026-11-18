@@ -1,5 +1,12 @@
-import { precacheAndRoute } from 'workbox-precaching';
+import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import { clientsClaim } from 'workbox-core';
 
+// registerType "autoUpdate" con injectManifest: el SW nuevo se activa apenas se instala y toma control de las
+// ventanas abiertas. Sin esto queda "esperando" hasta cerrar TODAS las pestañas y la app instalada, y los
+// usuarios siguen recibiendo push con el código viejo.
+self.skipWaiting();
+clientsClaim();
+cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 // Notificaciones push. El servidor envía: title, body, icon, badge, image, url, actionLabel, tag,
@@ -31,6 +38,21 @@ const receipt = (d) => (d?.nid && d?.rt
   }).catch(() => {})
   : Promise.resolve());
 
+// El navegador renovó la suscripción (vencimiento o rotación del push service) con la app cerrada:
+// se suscribe de nuevo y se informa al servidor usando el endpoint anterior como prueba de propiedad.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    const old = event.oldSubscription;
+    const key = old?.options?.applicationServerKey;
+    const sub = event.newSubscription || (key ? await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }) : null);
+    if (!old?.endpoint || !sub) { return; } // sin datos: la app re-suscribe al abrirse (syncPush)
+    await fetch('/api/notifications/devices/rotate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ oldEndpoint: old.endpoint, subscription: sub.toJSON() }),
+    }).catch(() => {});
+  })());
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const d = event.notification.data || {};
@@ -42,8 +64,9 @@ self.addEventListener('notificationclick', (event) => {
     const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const client = list.find((c) => new URL(c.url).origin === self.location.origin);
     if (client) {
-      await client.focus();
+      // Primero la navegación: si el navegador rechaza focus(), el usuario igual llega al detalle
       client.postMessage({ type: 'navigate', url: d.url || '/' });
+      await client.focus().catch(() => {});
       return;
     }
     await self.clients.openWindow(target);

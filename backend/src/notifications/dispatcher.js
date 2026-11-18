@@ -13,6 +13,12 @@ export const checkReadToken = (id, token) => {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
 
+// Urgencia de ENTREGA (encabezado Urgency de Web Push / prioridad FCM). Con "normal", Android en reposo
+// (Doze, pantalla bloqueada) puede demorar el aviso hasta la próxima ventana de mantenimiento: lo que
+// pasa en la guardia tiene que llegar en el momento. La prioridad VISUAL (requireInteraction) sigue siendo n.priority.
+const TIME_SENSITIVE = new Set(['access', 'visits', 'security', 'emergencies', 'alerts']);
+export const urgencyOf = (n) => (n.priority === 'high' || TIME_SENSITIVE.has(n.category) ? 'high' : 'normal');
+
 /** Contenido que recibe el service worker (máx. ~4 KB en Web Push). */
 export function buildPayload(n) {
   return {
@@ -45,6 +51,7 @@ export async function dispatch(n) {
   const msg = {
     payload: buildPayload(n),
     priority: n.priority,
+    urgency: urgencyOf(n),
     ttl: n.priority === 'high' ? 3600 : 86400, // un aviso urgente viejo no sirve; uno informativo, hasta un día
     topic: `n${n.id}`,
   };

@@ -7,6 +7,8 @@ const toKey = (b64) => {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 };
 
+const sameKey = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
 export const pushSupported = () =>
   typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
@@ -24,9 +26,15 @@ async function subscribe() {
   const { data } = await api.get('/auth/vapid-key');
   if (!data.key) { return false; }
   const reg = await navigator.serviceWorker.ready;
-  const sub =
-    (await reg.pushManager.getSubscription()) ||
-    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toKey(data.key) }));
+  const key = toKey(data.key);
+  let sub = await reg.pushManager.getSubscription();
+  // Suscripción hecha con otras claves VAPID (rotadas en el servidor): el push service la rechazaría siempre
+  const current = sub?.options?.applicationServerKey;
+  if (sub && current && !sameKey(new Uint8Array(current), key)) {
+    await sub.unsubscribe().catch(() => {});
+    sub = null;
+  }
+  sub ||= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   // Registra el dispositivo (varios por usuario). La plataforma la detecta el cliente: iPadOS se presenta como Mac.
   await api.post('/notifications/devices', { ...sub.toJSON(), platform: detectPlatform() });
   return true;

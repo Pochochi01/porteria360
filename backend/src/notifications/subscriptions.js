@@ -39,6 +39,18 @@ export async function register(who, sub) {
   }
 }
 
+/**
+ * El service worker renovó la suscripción (pushsubscriptionchange). El endpoint anterior es una URL
+ * secreta e imposible de adivinar: solo el navegador que la tenía puede presentarla.
+ * @returns {Promise<boolean>}
+ */
+export async function rotate(oldEndpoint, sub) {
+  const r = await query(
+    `UPDATE push_subscriptions SET endpoint=?, p256dh=?, auth=?, last_seen=NOW() WHERE endpoint=? AND channel='webpush'`,
+    [sub.endpoint, sub.keys.p256dh, sub.keys.auth, oldEndpoint]);
+  return r.affectedRows > 0;
+}
+
 /** Quita el dispositivo actual del usuario (al cerrar sesión o desactivar avisos). */
 export async function unregister(userId, { endpoint, fcmToken }) {
   const r = await query('DELETE FROM push_subscriptions WHERE user_id=? AND (endpoint=? OR fcm_token=?)', [userId, endpoint ?? null, fcmToken ?? null]);

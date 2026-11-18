@@ -27,11 +27,13 @@ export const webPushProvider = {
       await webpush.sendNotification(
         { endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth } },
         JSON.stringify(msg.payload),
-        { urgency: msg.priority === 'high' ? 'high' : 'normal', TTL: msg.ttl, topic: msg.topic },
+        { urgency: msg.urgency || 'normal', TTL: msg.ttl, topic: msg.topic },
       );
       return { ok: true };
     } catch (e) {
       if (e.statusCode === 404 || e.statusCode === 410) { return { gone: true }; }
+      // Suscripción creada con otras claves VAPID: nunca va a funcionar con las actuales (el cliente se re-suscribe al abrir)
+      if (e.statusCode === 403 && /do(es)? not correspond|mismatch|VapidPkHashMismatch/i.test(String(e.body))) { return { gone: true }; }
       const error = `webpush ${e.statusCode || e.code || ''} ${e.body || e.message}`.trim().slice(0, 300);
       return TRANSIENT(e.statusCode) ? { retry: true, error } : { error };
     }
@@ -85,8 +87,8 @@ export const fcmProvider = {
             token: device.fcm_token,
             notification: { title: p.title, body: p.body, ...(p.image ? { image: p.image } : {}) },
             data: strings({ url: p.url, nid: p.nid, rt: p.rt, tenantId: p.tenantId, entityType: p.entityType, entityId: p.entityId, type: p.type }),
-            android: { priority: msg.priority === 'high' ? 'HIGH' : 'NORMAL', ttl: `${msg.ttl}s`, collapse_key: msg.topic },
-            apns: { headers: { 'apns-priority': msg.priority === 'high' ? '10' : '5' } },
+            android: { priority: msg.urgency === 'high' ? 'HIGH' : 'NORMAL', ttl: `${msg.ttl}s`, collapse_key: msg.topic },
+            apns: { headers: { 'apns-priority': msg.urgency === 'high' ? '10' : '5' } },
           },
         }),
       });
