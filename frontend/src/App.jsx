@@ -88,7 +88,7 @@ function AppShell() {
         <nav aria-label="Panel" className="no-scrollbar flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:overflow-visible">
           {items.map((m) => (
             <NavLink key={m.to} to={m.to}
-              className={({ isActive }) => `touch-target flex items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
+              className={({ isActive }) => `touch-target relative flex items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                 isActive ? 'bg-black/25 font-medium dark:bg-white/10' : 'text-white/85 hover:bg-white/10'}`}>
               {m.label}
               {m.badge === 'unread' && unread > 0 && (

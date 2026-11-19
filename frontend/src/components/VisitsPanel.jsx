@@ -16,15 +16,15 @@ const isUpcoming = (v, now) =>
 
 const STATUS_FILTER = [
   ['', 'Todos'], ['pending', 'Pendiente'], ['authorized', 'Autorizada'], ['inside', 'Adentro'],
-  ['exited', 'Salió'], ['rejected', 'Rechazada'], ['expired', 'Vencida'],
+  ['exited', 'Salió'], ['rejected', 'Rechazada'], ['expired', 'Vencida'], ['cancelled', 'Cancelada'],
 ];
 const VIEWS = [{ id: 'upcoming', label: 'Próximos' }, { id: 'history', label: 'Historial' }];
 
 /**
  * Ingresos e invitaciones, plegado por defecto para no cargar la pantalla principal.
- * @param {{ visits: any[] | null, loading?: boolean }} props
+ * @param {{ visits: any[] | null, loading?: boolean, onCancel?: (v: any) => void }} props onCancel: anular una invitación QR sin usar
  */
-export function VisitsPanel({ visits, loading }) {
+export function VisitsPanel({ visits, loading, onCancel }) {
   const [view, setView] = useState('upcoming');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
@@ -89,6 +89,9 @@ export function VisitsPanel({ visits, loading }) {
                   </div>
                 </div>
                 <Status s={v.status} />
+                {onCancel && v.auth_method === 'qr' && v.status === 'authorized' && !v.entry_at && (
+                  <button type="button" className="btn-secondary !py-1 text-xs" onClick={() => onCancel(v)}>Cancelar</button>
+                )}
                 <dl className="grid w-full grid-cols-2 gap-x-3 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-4">
                   {v.valid_from && <div><dt className="inline text-slate-400">Desde </dt><dd className="inline">{fmtDate(v.valid_from)}</dd></div>}
                   {v.valid_until && <div><dt className="inline text-slate-400">Hasta </dt><dd className="inline">{fmtDate(v.valid_until)}</dd></div>}

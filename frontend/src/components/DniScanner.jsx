@@ -8,26 +8,29 @@ import { Icon } from './icons';
 /** @typedef {import('../lib/dni').DniData} DniData */
 
 const PDF417_TIMEOUT_MS = 15000; // sin PDF417 en este tiempo → modo OCR
-const HINTS = new Map([
-  [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417, BarcodeFormat.QR_CODE]],
-  [DecodeHintType.TRY_HARDER, true],
-]);
+const hints = (formats) => new Map([[DecodeHintType.POSSIBLE_FORMATS, formats], [DecodeHintType.TRY_HARDER, true]]);
+// DNI: PDF417 (y QR de invitación por comodidad). Invitación: solo QR, más rápido y sin falsos positivos
+const HINTS = { dni: hints([BarcodeFormat.PDF_417, BarcodeFormat.QR_CODE]), invitation: hints([BarcodeFormat.QR_CODE]) };
 const MSG = {
   scanning: 'Enfoque el código del DNI argentino',
   fallback: 'No se pudo leer el código del DNI. Se utilizará reconocimiento OCR.',
   ocr: 'Encuadrá el frente del DNI (o el dorso con las líneas <<<) y tocá "Capturar imagen".',
+  invitation: 'Enfoque el código QR de la invitación',
+  notInvitation: 'Ese código no es una invitación del sistema. Pedile al visitante el QR que le envió el propietario.',
 };
 
 /** Registro sin datos personales (no bloquea el flujo si falla). */
 const track = (event, extra = {}) => api.post('/dni/events', { event, ...extra }).catch(() => {});
 
 /**
- * Lector de DNI argentino: PDF417 por cámara (principal) con fallback automático a OCR en el servidor.
- * También reconoce los QR de invitación del sistema.
- * @param {{ onResult: (d: { nombreCompleto: string, dni: string, data?: DniData }) => void,
+ * Lector de la guardia (una sola instancia de cámara para los dos flujos):
+ *  - mode "dni": PDF417 del DNI argentino con fallback automático a OCR en el servidor. También reconoce QR de invitación.
+ *  - mode "invitation": solo QR de invitación (sin OCR).
+ * @param {{ mode?: 'dni' | 'invitation', onResult?: (d: { nombreCompleto: string, dni: string, data?: DniData }) => void,
  *           onInvitation?: (token: string) => void, onClose: () => void }} props
  */
-export default function DniScanner({ onResult, onInvitation, onClose }) {
+export default function DniScanner({ mode = 'dni', onResult, onInvitation, onClose }) {
+  const qrOnly = mode === 'invitation';
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
   const readerRef = useRef(null);
@@ -70,9 +73,10 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
         handledRef.current = true;
         stopCamera();
         onInvitation(text.trim());
-      } else { setNotice({ tone: 'warn', text: 'Ese QR no es una invitación del sistema. Enfoque el código PDF417 del DNI.' }); }
+      } else { setNotice({ tone: 'warn', text: qrOnly ? MSG.notInvitation : 'Ese QR no es una invitación del sistema. Enfoque el código PDF417 del DNI.' }); }
       return;
     }
+    if (qrOnly) { return; }
     const data = parseDniPdf417(text);
     if (!data) { return goOcr('parse'); }
     handledRef.current = true;
@@ -81,7 +85,7 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
     setResult({ nombreCompleto: data.nombreCompleto, dni: data.dni, data, source: 'pdf417' });
     setNotice({ tone: 'ok', text: '✅ DNI leído correctamente' });
     setPhase('confirm');
-  }, [goOcr, onInvitation, stopCamera]);
+  }, [goOcr, onInvitation, qrOnly, stopCamera]);
 
   /** @param {string} [camId] cámara elegida ('' = trasera / predeterminada) */
   const start = useCallback(async (camId = deviceId) => {
@@ -92,7 +96,7 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
     setNotice(null);
     setPhase('scanning');
     try {
-      readerRef.current ??= new BrowserMultiFormatReader(HINTS, { delayBetweenScanAttempts: 120 });
+      readerRef.current ??= new BrowserMultiFormatReader(HINTS[qrOnly ? 'invitation' : 'dni'], { delayBetweenScanAttempts: 120 });
       const video = camId
         ? { deviceId: { exact: camId } }
         : { facingMode: { ideal: 'environment' } }; // cámara trasera en celulares
@@ -104,7 +108,7 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
       startedAt.current = performance.now();
       // Con permiso concedido ya se ven los nombres de las cámaras (selector en PC)
       BrowserMultiFormatReader.listVideoInputDevices().then(setDevices).catch(() => {});
-      timerRef.current = setTimeout(() => { if (!handledRef.current) { goOcr('timeout'); } }, PDF417_TIMEOUT_MS);
+      if (!qrOnly) { timerRef.current = setTimeout(() => { if (!handledRef.current) { goOcr('timeout'); } }, PDF417_TIMEOUT_MS); }
     } catch (e) {
       stopCamera();
       setPhase('idle');
@@ -114,7 +118,7 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
         ? '❌ Sin permiso para usar la cámara. Habilitalo en el navegador (requiere HTTPS) o cargá los datos a mano.'
         : '❌ No se pudo abrir la cámara. Verificá que no la esté usando otra aplicación.' });
     }
-  }, [deviceId, goOcr, handleText, stopCamera]);
+  }, [deviceId, goOcr, handleText, qrOnly, stopCamera]);
 
   /** Captura un frame: primero intenta PDF417 sobre la foto completa; si no, OCR en el servidor. */
   const capture = async () => {
@@ -176,6 +180,10 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
     onResult({ nombreCompleto, dni, data: result.data });
   };
 
+  // Se abre desde un botón de la guardia: la cámara arranca sola (un toque menos por visitante).
+  // Solo al montar: cambiar de cámara reinicia por su cuenta (selector).
+  useEffect(() => { start(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Liberar la cámara al desmontar y si la pestaña queda oculta
   useEffect(() => {
     const onHide = () => { if (document.hidden && controlsRef.current) { stopCamera(); setPhase('idle'); } };
@@ -196,9 +204,9 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
   const toneClass = { ok: 'bg-emerald-500/15 text-emerald-200', warn: 'bg-amber-500/15 text-amber-200', error: 'bg-red-500/15 text-red-200' };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Escanear DNI" className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white">
+    <div role="dialog" aria-modal="true" aria-label={qrOnly ? 'Escanear invitación' : 'Escanear DNI'} className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white">
       <header className="flex items-center justify-between gap-3 px-4 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
-        <h2 className="font-display text-lg font-bold">Escanear DNI</h2>
+        <h2 className="font-display text-lg font-bold">{qrOnly ? 'Escanear invitación' : 'Escanear DNI'}</h2>
         <div className="flex items-center gap-2">
           {devices.length > 1 && showCamera && (
             <select aria-label="Cámara" value={deviceId} onChange={(e) => { setDeviceId(e.target.value); start(e.target.value); }}
@@ -219,23 +227,23 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
         {showCamera && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center p-6">
             {/* Guía de encuadre: proporción del DNI (85,6 × 54 mm) */}
-            <div className={`relative aspect-[1.586] w-full max-w-xl rounded-2xl border-2 shadow-[0_0_0_100vmax_rgb(2_6_23/0.55)] ${phase === 'ocr' ? 'border-amber-400' : 'border-emerald-400'}`}>
-              {phase === 'scanning' && (
+            <div className={`relative ${qrOnly ? 'aspect-square max-w-xs' : 'aspect-[1.586] max-w-xl'} w-full rounded-2xl border-2 shadow-[0_0_0_100vmax_rgb(2_6_23/0.55)] ${phase === 'ocr' ? 'border-amber-400' : 'border-emerald-400'}`}>
+              {phase === 'scanning' && !qrOnly && (
                 <>
                   <div className="absolute inset-x-6 bottom-[14%] h-[26%] rounded-lg border border-dashed border-white/60" />
                   <span className="absolute inset-x-6 bottom-[27%] h-0.5 animate-pulse bg-emerald-400/80" />
                 </>
               )}
             </div>
-            <p className="mt-5 max-w-md text-center text-base font-medium drop-shadow">{phase === 'ocr' ? MSG.ocr : MSG.scanning}</p>
+            <p className="mt-5 max-w-md text-center text-base font-medium drop-shadow">{qrOnly ? MSG.invitation : phase === 'ocr' ? MSG.ocr : MSG.scanning}</p>
           </div>
         )}
 
         {phase === 'idle' && (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
             <span className="grid h-20 w-20 place-items-center rounded-3xl bg-white/10"><Icon name="camera" className="h-9 w-9" /></span>
-            <p className="max-w-sm text-lg">{MSG.scanning}</p>
-            <p className="max-w-sm text-sm text-white/60">Se lee el código PDF417 del dorso del DNI. Si no se puede, se usa reconocimiento de texto.</p>
+            <p className="max-w-sm text-lg">{qrOnly ? MSG.invitation : MSG.scanning}</p>
+            <p className="max-w-sm text-sm text-white/60">{qrOnly ? 'El QR identifica la invitación; los datos del visitante se consultan al sistema.' : 'Se lee el código PDF417 del dorso del DNI. Si no se puede, se usa reconocimiento de texto.'}</p>
           </div>
         )}
 
@@ -272,7 +280,7 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
             <div className="grid gap-2">
               <button className="btn-primary h-12 text-base">Confirmar datos</button>
               {!editing && <button type="button" className="btn-secondary h-11" onClick={() => setEditing(true)}>Corregir manualmente</button>}
-              <button type="button" className="btn h-11 bg-white/10 text-white hover:bg-white/20" onClick={() => start()}>Reintentar escaneo</button>
+              <button type="button" className="btn h-11 bg-white/10 text-white hover:bg-white/20" onClick={() => start()}>Volver a escanear</button>
             </div>
           </form>
         )}
@@ -284,9 +292,9 @@ export default function DniScanner({ onResult, onInvitation, onClose }) {
       {phase !== 'confirm' && (
         <footer className="grid grid-cols-2 gap-2 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex sm:justify-center">
           {phase === 'idle' && <button type="button" className="btn-primary col-span-2 h-12 text-base sm:px-8" onClick={() => start()}>Iniciar escaneo</button>}
-          {showCamera && <button type="button" className="btn-primary h-12 text-base sm:px-8" onClick={capture}><Icon name="camera" className="h-5 w-5" />Capturar imagen</button>}
+          {showCamera && !qrOnly && <button type="button" className="btn-primary h-12 text-base sm:px-8" onClick={capture}><Icon name="camera" className="h-5 w-5" />Capturar imagen</button>}
           {(showCamera || phase === 'failed') && <button type="button" className="btn h-12 bg-white/10 text-white hover:bg-white/20 sm:px-6" onClick={() => start()}>Reintentar</button>}
-          {phase !== 'processing' && <button type="button" className="btn h-12 bg-white/10 text-white hover:bg-white/20 sm:px-6" onClick={manual}>Cargar a mano</button>}
+          {phase !== 'processing' && !qrOnly && <button type="button" className="btn h-12 bg-white/10 text-white hover:bg-white/20 sm:px-6" onClick={manual}>Cargar a mano</button>}
           <button type="button" className="btn h-12 bg-white/10 text-white hover:bg-white/20 sm:px-6" onClick={onClose}>Cancelar</button>
         </footer>
       )}

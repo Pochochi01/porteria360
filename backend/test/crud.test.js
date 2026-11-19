@@ -165,13 +165,104 @@ test('familia: el propietario edita, no elimina; el admin elimina', async () => 
   assert.equal(await one('SELECT user_id FROM user_roles WHERE user_id=?', [ids.family]), undefined);
 });
 
-test('visitas: guardia edita, solo admin elimina', async () => {
-  const v = await call('POST', '/visits/request', { token: tok.guard, expect: 201, body: { lot_id: ids.lot, visitor_name: 'Juan', visitor_dni: '123' } });
-  await call('PUT', `/visits/${v.id}`, { token: tok.guard, body: { visitor_name: 'Juan Pérez', vehicle_plate: 'AB123CD' }, expect: 200 });
+test('visitas: la guardia no edita ni borra; supervisor edita, solo admin elimina', async () => {
+  const v = await call('POST', '/visits/request', { token: tok.guard, expect: 201, body: { lot_id: ids.lot, visitor_name: 'Juan', visitor_dni: '30.123.456' } });
+  assert.equal(v.visitor_dni, '30123456', 'el DNI se guarda sin puntos');
+  await call('PUT', `/visits/${v.id}`, { token: tok.guard, body: { visitor_name: 'Juan Pérez' }, expect: 403 });
+  await call('PUT', `/visits/${v.id}`, { token: tok.supervisor, body: { visitor_name: 'Juan Pérez', vehicle_plate: 'AB123CD' }, expect: 200 });
   assert.equal((await one('SELECT visitor_name FROM visits WHERE id=?', [v.id])).visitor_name, 'Juan Pérez');
   await call('DELETE', `/visits/${v.id}`, { token: tok.guard, expect: 403 });
   await call('DELETE', `/visits/${v.id}`, { token: tok.admin, expect: 200 });
   assert.equal(await one('SELECT id FROM visits WHERE id=?', [v.id]), undefined);
+});
+
+test('control de accesos: invitación QR de punta a punta (validar, ingresar, reutilizar, cancelar, vencida)', async () => {
+  const local = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const now = Date.now();
+  const range = { valid_from: local(new Date(now - 3600e3)), valid_until: local(new Date(now + 3600e3)) };
+  // El propietario debe cargar el DNI
+  await call('POST', '/visits/qr', { token: tok.owner, body: { visitor_name: 'Ana Gómez', ...range }, expect: 400 });
+  const inv = await call('POST', '/visits/qr', { token: tok.owner, body: { visitor_name: 'Ana Gómez', visitor_dni: '28123456', notes: 'Trae torta', ...range }, expect: 201 });
+  assert.match(inv.qr_token, /^[a-f0-9]{32}$/, 'el QR solo contiene un token aleatorio');
+
+  // Guardia: tokens manipulados o inexistentes; otros roles no validan
+  await call('GET', '/visits/invitation/manipulado', { token: tok.guard, expect: 400 });
+  await call('GET', `/visits/invitation/${'0'.repeat(32)}`, { token: tok.guard, expect: 404 });
+  await call('GET', `/visits/invitation/${inv.qr_token}`, { token: tok.owner, expect: 403 });
+
+  // Validación: datos completos para la tarjeta
+  const val = await call('GET', `/visits/invitation/${inv.qr_token}`, { token: tok.guard, expect: 200 });
+  assert.equal(val.state, 'pending');
+  assert.equal(val.can_enter, true);
+  assert.equal(val.invitation.visitor_dni, '28123456');
+  assert.equal(val.invitation.lot_code, 'A-1');
+  assert.equal(val.invitation.notes, 'Trae torta');
+  assert.match(val.invitation.family || '', /Owner Editado/);
+
+  // Confirmar ingreso: guarda método, guardia y hora; un segundo ingreso es imposible
+  const entered = await call('POST', `/visits/${inv.id}/entry`, { token: tok.guard, expect: 200 });
+  assert.equal(entered.status, 'inside');
+  assert.equal(entered.entry_method, 'invitation_qr');
+  assert.equal(entered.entry_guard_id, ids.guard);
+  const twice = await call('POST', `/visits/${inv.id}/entry`, { token: tok.guard, expect: 409 });
+  assert.match(twice.error, /^Esta invitación ya fue utilizada el \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+  const rescan = await call('GET', `/visits/invitation/${inv.qr_token}`, { token: tok.guard, expect: 200 });
+  assert.equal(rescan.state, 'used');
+  assert.equal(rescan.can_enter, false);
+  assert.equal(rescan.message, twice.error);
+  // Auditoría: escaneo, ingreso, intento repetido y nuevo escaneo
+  const acts = (await query("SELECT action FROM audit_log WHERE entity='visit' AND entity_id=? ORDER BY id", [inv.id])).map((a) => a.action);
+  assert.deepEqual(acts.filter((a) => a !== 'qr_created'), ['qr_scanned', 'entry', 'entry_denied', 'qr_scanned']);
+
+  // Cancelada por el propietario
+  const c = await call('POST', '/visits/qr', { token: tok.owner, body: { visitor_name: 'Leo Paz', visitor_dni: '35111222', ...range }, expect: 201 });
+  await call('POST', `/visits/${c.id}/cancel`, { token: tok.owner, expect: 200 });
+  const cv = await call('GET', `/visits/invitation/${c.qr_token}`, { token: tok.guard, expect: 200 });
+  assert.equal(cv.state, 'cancelled');
+  await call('POST', `/visits/${c.id}/entry`, { token: tok.guard, expect: 409 });
+
+  // Vencida: queda marcada al escanearla
+  const e = await call('POST', '/visits/qr', { token: tok.owner, body: { visitor_name: 'Eva Ruiz', visitor_dni: '36111222', ...range }, expect: 201 });
+  await query('UPDATE visits SET valid_until = NOW() - INTERVAL 1 MINUTE WHERE id=?', [e.id]);
+  const ev = await call('GET', `/visits/invitation/${e.qr_token}`, { token: tok.guard, expect: 200 });
+  assert.equal(ev.state, 'expired');
+  assert.equal((await one('SELECT status FROM visits WHERE id=?', [e.id])).status, 'expired');
+  await call('POST', `/visits/${e.id}/entry`, { token: tok.guard, expect: 409 });
+});
+
+test('control de accesos: ingreso con DNI, rechazo, movimientos filtrados en el servidor y buscador de lotes', async () => {
+  // DNI manual: ingreso directo y rechazo de un visitante sin invitación
+  const w = await call('POST', '/visits/walk-in', { token: tok.guard, body: { lot_id: ids.lot, visitor_name: 'PÉREZ JUAN', visitor_dni: '32123456', type: 'delivery' }, expect: 201 });
+  assert.equal(w.status, 'inside');
+  assert.equal(w.entry_method, 'dni_manual');
+  await call('POST', '/visits/walk-in', { token: tok.guard, body: { lot_id: ids.lot, visitor_name: 'Juan', visitor_dni: 'abc' }, expect: 400 });
+  await call('POST', '/visits/walk-in', { token: tok.owner, body: { lot_id: ids.lot, visitor_name: 'Juan', visitor_dni: '32123456' }, expect: 403 });
+  const rj = await call('POST', '/visits/reject', { token: tok.guard, body: { lot_id: ids.lot, visitor_name: 'SOSA RAÚL', visitor_dni: '33123456', reason: 'No figura en la lista' }, expect: 200 });
+  assert.equal(rj.status, 'rejected');
+  assert.equal(rj.rejected_by, ids.guard);
+  await call('POST', `/visits/${w.id}/exit`, { token: tok.guard, expect: 200 });
+
+  // Movimientos: últimos 5, filtrados por el backend, con familia
+  const all = await call('GET', '/visits?movement=all&limit=5', { token: tok.guard, expect: 200 });
+  assert.ok(all.items.length <= 5);
+  // El egreso y el rechazo ocurren en el mismo segundo: ambos encabezan la lista (desempate por id)
+  assert.deepEqual(all.items.slice(0, 2).map((m) => m.id).sort(), [w.id, rj.id].sort());
+  assert.match(all.items.find((m) => m.id === w.id).family || '', /Owner Editado/);
+  const out = await call('GET', '/visits?movement=exited', { token: tok.guard, expect: 200 });
+  assert.ok(out.items.every((m) => m.status === 'exited') && out.items.some((m) => m.id === w.id));
+  const rej = await call('GET', '/visits?movement=rejected', { token: tok.guard, expect: 200 });
+  assert.ok(rej.items.every((m) => m.status === 'rejected') && rej.items.some((m) => m.id === rj.id));
+  await call('GET', '/visits?movement=todo', { token: tok.guard, expect: 400 });
+  const p2 = await call('GET', '/visits?movement=all&limit=1&offset=1', { token: tok.guard, expect: 200 });
+  assert.equal(p2.items[0]?.id, all.items[1].id, 'paginación');
+
+  // Buscador de lote: por número y por apellido del grupo familiar
+  const byCode = await call('GET', '/lots/search?q=A-1', { token: tok.guard, expect: 200 });
+  assert.equal(byCode.items[0].code, 'A-1');
+  const byName = await call('GET', `/lots/search?q=${encodeURIComponent('Familia Editado')}`, { token: tok.guard, expect: 200 });
+  assert.deepEqual(byName.items.map((l) => l.code), ['A-1']);
+  assert.equal(byName.items[0].holder, 'Owner Editado');
+  await call('GET', '/lots/search?q=A', { token: tok.owner, expect: 403 });
 });
 
 test('rondas y puntos: dependencias, cascada con force y permisos', async () => {

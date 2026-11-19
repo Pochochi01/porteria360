@@ -174,6 +174,13 @@ const COLUMNS = [
   ['push_subscriptions', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP'],
   ['push_subscriptions', 'updated_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'],
   ['push_subscriptions', 'last_seen', 'DATETIME NULL'],
+  // Control de accesos: invitaciones (QR) y movimientos de la guardia
+  ['visits', 'entry_method', "ENUM('invitation_qr','dni_manual') NULL"], // cómo ingresó (INVITACION_QR / DNI_MANUAL)
+  ['visits', 'rejected_at', 'DATETIME NULL'],
+  ['visits', 'rejected_by', 'INT NULL'],
+  ['visits', 'reject_reason', 'VARCHAR(255) NULL'],
+  ['visits', 'cancelled_at', 'DATETIME NULL'],
+  ['visits', 'last_movement_at', 'DATETIME NULL'], // último ingreso, egreso o rechazo: ordena el historial por índice
 ];
 
 // Columnas que pasan a aceptar NULL: [tabla, columna, definición completa]
@@ -188,6 +195,10 @@ const NULLABLE = [
 const ENUMS = [
   ['expense_payments', 'method', "ENUM('transfer','cash','mercadopago') NOT NULL"],
   ['tenant_assets', 'kind', "ENUM('logo','cover','video','image','document') NOT NULL"],
+  // cancelled: invitación anulada por el propietario antes de usarse
+  ['visits', 'status', "ENUM('pending','authorized','rejected','inside','exited','expired','cancelled') NOT NULL DEFAULT 'pending'"],
+  // guard: ingreso autorizado directamente por la guardia (DNI escaneado, sin aprobación previa)
+  ['visits', 'auth_method', "ENUM('qr','realtime','guard') NULL"],
 ];
 
 const INDEXES = [
@@ -195,6 +206,10 @@ const INDEXES = [
   ['expense_settlements', 'ix_settle_run', 'CREATE INDEX ix_settle_run ON expense_settlements (run_id)'],
   ['push_subscriptions', 'uq_push_fcm', 'CREATE UNIQUE INDEX uq_push_fcm ON push_subscriptions (fcm_token)'],
   ['push_subscriptions', 'ix_push_user', 'CREATE INDEX ix_push_user ON push_subscriptions (tenant_id, user_id)'],
+  ['visits', 'ix_visits_moves', 'CREATE INDEX ix_visits_moves ON visits (tenant_id, last_movement_at)'],
+  ['visits', 'ix_visits_entry', 'CREATE INDEX ix_visits_entry ON visits (tenant_id, entry_at)'],
+  ['visits', 'ix_visits_dni', 'CREATE INDEX ix_visits_dni ON visits (tenant_id, visitor_dni)'],
+  ['visits', 'ix_visits_lot', 'CREATE INDEX ix_visits_lot ON visits (lot_id, status)'],
 ];
 
 /**
@@ -240,6 +255,12 @@ export async function migrate(db) {
       done.push(`índice ${name}`);
     }
   }
+  // Movimientos históricos: fecha del último movimiento (los nuevos la escriben al registrar ingreso/egreso/rechazo)
+  const [mv] = await db.query(
+    `UPDATE visits SET last_movement_at = CASE status WHEN 'exited' THEN COALESCE(exit_at, entry_at) WHEN 'inside' THEN entry_at
+       ELSE COALESCE(rejected_at, authorized_at, created_at) END
+     WHERE last_movement_at IS NULL AND status IN ('inside','exited','rejected')`);
+  if (mv.affectedRows) { done.push(`${mv.affectedRows} movimiento(s) históricos con fecha`); }
   // Lotes principales actuales de propietarios → user_lots (para que el portal los vea igual que hoy)
   const [r] = await db.query(
     `INSERT IGNORE INTO user_lots (user_id, lot_id, tenant_id)

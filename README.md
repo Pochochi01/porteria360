@@ -48,7 +48,7 @@ npm start          # NODE_ENV=production: Express sirve el API y la PWA en el mi
 |---|---|
 | Auth | `POST /auth/login`, `GET /auth/me`, `POST /auth/push-subscription` |
 | Usuarios / lotes | `GET/POST /lots`, `GET/POST/PATCH /users` (admin), `GET/POST/PATCH /household` (propietario), `PATCH /profile` |
-| Accesos | `POST /visits/qr` (residente), `POST /visits/scan`, `POST /visits/request` (guardia), `POST /visits/:id/decision`, `/entry`, `/exit`, `GET /visits/:id/trace` |
+| Accesos | Propietario: `POST /visits/qr` (nombre, DNI, fecha y observaciones; el QR lleva solo un token aleatorio), `POST /visits/:id/cancel`, `POST /visits/:id/decision`. Guardia: `GET /visits/invitation/:token` (valida), `POST /visits/:id/entry` (ingreso atómico, una sola vez), `POST /visits/walk-in` (ingreso con DNI), `POST /visits/request` (pide autorización), `POST /visits/reject`, `/exit`, `GET /visits?movement=all|inside|exited|rejected&limit=5`, `GET /visits?view=active`, `GET /lots/search?q=&page=`, `GET /visits/:id/trace` |
 | Rondas | `GET/POST /checkpoints`, `POST /rounds/start`, `POST /rounds/:id/scan` (NFC/QR + GPS), `/finish`, `GET /rounds` (tablero). Un job marca cada minuto las rondas vencidas y dispara alertas |
 | Expensas | `POST /expenses/import` (Excel: lote, periodo, importe, vencimiento, detalle), `GET /expenses`, `POST /expenses/:id/transfer` (con comprobante), `/cash`, `POST /expenses/payments/:id/review`. Se rechaza todo importe distinto al total liquidado |
 | Reservas | `GET/POST /spaces`, `GET /spaces/:id/availability?date=`, `GET/POST /reservations`, `/review`, `/cancel`. Reglas: cupo, horario, anticipación mínima y máxima, tope semanal por lote (con lock `FOR UPDATE`) |
@@ -60,7 +60,7 @@ Cada módulo define su modelo en `backend/src/models/` (tabla, campos editables,
 
 - **Documentación:** Swagger UI en `/api/docs`, especificación en `/api/docs.json` (copia en `docs/openapi.json`, importable en Postman).
 - **DELETE es hard delete.** Si el registro tiene datos relacionados responde `409` con `dependencies`. Reenviando con `?force=1` borra también esos datos, en una transacción. Las dependencias marcadas `block` (por ejemplo, un lote con usuarios asignados) impiden el borrado hasta reasignarlas.
-- **Permisos:** solo `admin` elimina dentro de un complejo y solo `superadmin` elimina complejos. Quién edita depende del módulo (por ejemplo, un guardia edita visitas e incidentes y un supervisor edita rondas y puntos de control).
+- **Permisos:** solo `admin` elimina dentro de un complejo y solo `superadmin` elimina complejos. Quién edita depende del módulo (por ejemplo, un guardia registra ingresos, egresos y rechazos pero no edita visitas; un supervisor edita visitas, rondas y puntos de control).
 - **Auditoría:** cada edición guarda en `audit_log` los cambios (antes y después) y cada eliminación guarda el registro borrado y lo que se borró en cascada.
 - **Pruebas:** `npm test` en `backend/`. Crea un complejo y usuarios de prueba, prueba edición, eliminación, cascadas, permisos por rol y aislamiento entre complejos, y al final borra todo.
 
