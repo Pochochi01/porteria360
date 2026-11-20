@@ -5,6 +5,9 @@ import { ah, audit, validate, HttpError, nowSql } from '../lib/helpers.js';
 import { requireRole } from '../middleware/auth.js';
 import { emitToRoles } from '../lib/realtime.js';
 import { publish } from '../notifications/events.js';
+import { GEO, SCAN_STATUS, SUSPICIOUS, evaluateScan, zGeoReport, zLat, zLng } from '../lib/geo.js';
+import { describeAgent } from '../notifications/subscriptions.js';
+import { log } from '../lib/log.js';
 
 const r = Router();
 const SUP = ['supervisor', 'admin'];
@@ -21,10 +24,22 @@ async function roundDetail(tenantId, roundId) {
      WHERE r.id=? AND r.tenant_id=?`, [roundId, tenantId]);
   if (!round) { return null; }
   round.points = await query(
-    `SELECT rp.*, c.name FROM round_points rp JOIN checkpoints c ON c.id=rp.checkpoint_id
+    `SELECT rp.*, c.name, c.lat AS cp_lat, c.lng AS cp_lng, c.radius_m FROM round_points rp JOIN checkpoints c ON c.id=rp.checkpoint_id
      WHERE rp.round_id=? ORDER BY rp.sort_order`, [roundId]);
+  round.geo = { max_accuracy_m: GEO.maxAccuracyM };
   return round;
 }
+
+// Ubicación de un punto: las dos coordenadas o ninguna (sin ubicación el punto no se puede marcar)
+export const zCheckpoint = z.object({
+  name: z.string().trim().min(1).max(80),
+  tag_code: z.string().trim().min(4, 'Mínimo 4 caracteres').max(64),
+  sort_order: z.number().int().default(0),
+  lat: zLat.nullable().default(null),
+  lng: zLng.nullable().default(null),
+  radius_m: z.number().int().min(5, 'Mínimo 5 m').max(1000, 'Máximo 1000 m').default(GEO.defaultRadiusM),
+});
+const bothOrNone = (b) => (b.lat === undefined && b.lng === undefined) || ((b.lat == null) === (b.lng == null));
 
 // --- Puntos de control (supervisor) ---
 r.get('/checkpoints', ah(async (req, res) => {
@@ -32,10 +47,12 @@ r.get('/checkpoints', ah(async (req, res) => {
 }));
 
 r.post('/checkpoints', requireRole(...SUP),
-  validate(z.object({ name: z.string().min(1), tag_code: z.string().min(4).max(64), sort_order: z.number().int().default(0) })),
+  validate(zCheckpoint.refine(bothOrNone, { message: 'Cargue latitud y longitud juntas', path: ['lat'] })),
   ah(async (req, res) => {
-    const x = await query('INSERT INTO checkpoints (tenant_id,name,tag_code,sort_order) VALUES (?,?,?,?)',
-      [req.tenantId, req.body.name, req.body.tag_code, req.body.sort_order]);
+    const b = req.body;
+    const x = await query('INSERT INTO checkpoints (tenant_id,name,tag_code,sort_order,lat,lng,radius_m) VALUES (?,?,?,?,?,?,?)',
+      [req.tenantId, b.name, b.tag_code, b.sort_order, b.lat, b.lng, b.radius_m]);
+    await audit(req, 'checkpoint', x.insertId, 'create', { name: b.name, lat: b.lat, lng: b.lng, radius_m: b.radius_m });
     res.status(201).json({ id: x.insertId });
   }));
 
@@ -64,21 +81,58 @@ r.get('/rounds/current', requireRole('guard'), ah(async (req, res) => {
   res.json(open ? await roundDetail(req.tenantId, open.id) : null);
 }));
 
+// Marca de un punto. Sin ubicación válida, imprecisa o fuera del radio NO se registra:
+// el intento queda en round_scans (y en audit_log si es sospechoso) y se responde 422 con el motivo.
+// El cliente solo informa lo que midió: distancia, precisión y estado se deciden acá.
 r.post('/rounds/:id/scan', requireRole('guard'),
-  validate(z.object({ tag_code: z.string(), method: z.enum(['nfc', 'qr']), lat: z.number().optional(), lng: z.number().optional() })),
+  validate(z.object({ tag_code: z.string().trim().min(1).max(64), method: z.enum(['nfc', 'qr']) }).merge(zGeoReport)),
   ah(async (req, res) => {
     const guardId = await guardOf(req);
     const [round] = await query("SELECT * FROM rounds WHERE id=? AND tenant_id=? AND guard_id=? AND status='in_progress'",
       [req.params.id, req.tenantId, guardId]);
     if (!round) { throw new HttpError(404, 'Ronda no activa'); }
-    const [cp] = await query('SELECT id FROM checkpoints WHERE tenant_id=? AND tag_code=?', [req.tenantId, req.body.tag_code]);
-    if (!cp) { throw new HttpError(404, 'Tag desconocido'); }
-    const x = await query('UPDATE round_points SET scanned_at=?, method=?, lat=?, lng=? WHERE round_id=? AND checkpoint_id=? AND scanned_at IS NULL',
-      [nowSql(), req.body.method, req.body.lat ?? null, req.body.lng ?? null, round.id, cp.id]);
-    if (!x.affectedRows) { throw new HttpError(409, 'Punto ya marcado'); }
+    const [cp] = await query('SELECT id,name,lat,lng,radius_m FROM checkpoints WHERE tenant_id=? AND tag_code=? AND active=1',
+      [req.tenantId, req.body.tag_code]);
+    if (!cp) {
+      await audit(req, 'round', round.id, 'scan_unknown_tag', { tag_code: req.body.tag_code.slice(0, 64) });
+      throw new HttpError(404, 'Código desconocido: no corresponde a un punto de control');
+    }
+    const [point] = await query('SELECT id, scanned_at FROM round_points WHERE round_id=? AND checkpoint_id=?', [round.id, cp.id]);
+    if (!point) { throw new HttpError(409, 'Este punto no forma parte de la ronda en curso'); }
+    if (point.scanned_at) { throw new HttpError(409, `El punto "${cp.name}" ya fue marcado en esta ronda`); }
+
+    const v = evaluateScan(cp, req.body);
+    const p = req.body.position;
+    const dist = v.distance == null ? null : Math.round(v.distance * 10) / 10;
+    const ua = describeAgent(req.get('user-agent') || '');
+    const at = nowSql();
+    const scanId = await tx(async (c) => {
+      const [x] = await c.execute(
+        `INSERT INTO round_scans (tenant_id,round_id,checkpoint_id,user_id,scanned_at,method,status,lat,lng,accuracy_m,distance_m,
+           cp_lat,cp_lng,cp_radius_m,geo_error,device,browser,ip) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [req.tenantId, round.id, cp.id, req.user.id, at, req.body.method, v.status, p?.lat ?? null, p?.lng ?? null,
+          v.accuracy, dist, cp.lat, cp.lng, cp.radius_m, req.body.geo_error ?? null, ua.device, ua.browser, String(req.ip || '').slice(0, 45)]);
+      if (v.status === 'valid') {
+        // Condicional: si dos escaneos llegan a la vez, solo uno marca el punto
+        const [u] = await c.execute(
+          'UPDATE round_points SET scanned_at=?, method=?, lat=?, lng=?, accuracy_m=?, distance_m=?, scan_id=? WHERE id=? AND scanned_at IS NULL',
+          [at, req.body.method, p.lat, p.lng, v.accuracy, dist, x.insertId, point.id]);
+        if (!u.affectedRows) { throw new HttpError(409, `El punto "${cp.name}" ya fue marcado en esta ronda`); }
+      }
+      return x.insertId;
+    });
+
+    const info = { scan_id: scanId, round_id: round.id, checkpoint_id: cp.id, checkpoint: cp.name, status: v.status,
+      distance_m: dist == null ? null : Math.round(dist), accuracy_m: v.accuracy, lat: p?.lat ?? null, lng: p?.lng ?? null };
+    log[v.status === 'valid' ? 'info' : 'warn']('round.scan', { tenant: req.tenantId, user: req.user.id, ...info });
+    if (v.status !== 'valid') {
+      if (SUSPICIOUS.has(v.status)) { await audit(req, 'round_scan', scanId, v.status, info); }
+      emitToRoles(req.tenantId, SUP, 'round:scan', { ...info, guard_id: guardId, at });
+      throw new HttpError(422, v.message, { status: v.status, distance_m: info.distance_m, accuracy_m: v.accuracy, radius_m: cp.radius_m });
+    }
     const detail = await roundDetail(req.tenantId, round.id);
     emitToRoles(req.tenantId, SUP, 'round:updated', detail);
-    res.json(detail);
+    res.json({ ...detail, scan: { ...info, message: v.message } });
   }));
 
 r.post('/rounds/:id/finish', requireRole('guard'), ah(async (req, res) => {
@@ -100,6 +154,30 @@ r.get('/rounds', requireRole(...SUP), ah(async (req, res) => {
   const rows = await query("SELECT id FROM rounds WHERE tenant_id=? AND started_at >= NOW() - INTERVAL 24 HOUR ORDER BY started_at DESC",
     [req.tenantId]);
   res.json(await Promise.all(rows.map((x) => roundDetail(req.tenantId, x.id))));
+}));
+
+// Recorrido de una ronda: marcas + todos los intentos (válidos y rechazados) con la ubicación del punto, para el mapa
+r.get('/rounds/:id/scans', requireRole(...SUP), ah(async (req, res) => {
+  const round = await roundDetail(req.tenantId, req.params.id);
+  if (!round) { throw new HttpError(404, 'Ronda no encontrada'); }
+  round.scans = await query(
+    `SELECT s.*, c.name FROM round_scans s JOIN checkpoints c ON c.id=s.checkpoint_id
+     WHERE s.round_id=? ORDER BY s.scanned_at, s.id`, [round.id]);
+  res.json(round);
+}));
+
+// Informe de intentos (por defecto, los no válidos) de los últimos días: base para detectar fraude
+r.get('/round-scans', requireRole(...SUP), ah(async (req, res) => {
+  const days = Math.min(Math.max(parseInt(req.query.days, 10) || 7, 1), 90);
+  const status = String(req.query.status || 'invalid');
+  if (status !== 'invalid' && status !== 'all' && !SCAN_STATUS.includes(status)) { throw new HttpError(400, 'Estado inválido'); }
+  const cond = status === 'invalid' ? " AND s.status<>'valid'" : status === 'all' ? '' : ' AND s.status=?';
+  const rows = await query(
+    `SELECT s.*, c.name, u.full_name AS guard_name FROM round_scans s
+     JOIN checkpoints c ON c.id=s.checkpoint_id JOIN users u ON u.id=s.user_id
+     WHERE s.tenant_id=? AND s.scanned_at >= NOW() - INTERVAL ${days} DAY${cond}
+     ORDER BY s.scanned_at DESC, s.id DESC LIMIT 200`, cond.includes('?') ? [req.tenantId, status] : [req.tenantId]);
+  res.json(rows);
 }));
 
 async function raiseAlert(tenantId, round, message) {

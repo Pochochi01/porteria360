@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { defineModel, count } from '../lib/crud.js';
+import { HttpError } from '../lib/helpers.js';
+import { zLat, zLng } from '../lib/geo.js';
 
 export const checkpoints = defineModel({
   path: 'checkpoints',
@@ -12,9 +14,20 @@ export const checkpoints = defineModel({
     tag_code: z.string().trim().min(4, 'Mínimo 4 caracteres').max(64),
     sort_order: z.number().int(),
     active: z.boolean(),
+    lat: zLat.nullable(),
+    lng: zLng.nullable(),
+    radius_m: z.number().int().min(5, 'Mínimo 5 m').max(1000, 'Máximo 1000 m'),
   }).partial(),
+  // La ubicación se edita completa: un punto con una sola coordenada no se podría validar
+  beforeUpdate: async (c, row, b) => {
+    const lat = b.lat !== undefined ? b.lat : row.lat;
+    const lng = b.lng !== undefined ? b.lng : row.lng;
+    if ((lat == null) !== (lng == null)) { throw new HttpError(400, 'Cargue latitud y longitud juntas'); }
+    return b;
+  },
   dependencies: async (c, row) => [
     { label: 'marcas en rondas', count: await count(c, 'SELECT COUNT(*) n FROM round_points WHERE checkpoint_id=?', [row.id]) },
+    { label: 'intentos de escaneo auditados', count: await count(c, 'SELECT COUNT(*) n FROM round_scans WHERE checkpoint_id=?', [row.id]) },
   ],
   cascade: (c, row) => c.execute('DELETE FROM round_points WHERE checkpoint_id=?', [row.id]),
 });

@@ -149,6 +149,34 @@ const TABLES = [
     INDEX ix_ann_tenant (tenant_id, created_at),
     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
   )`,
+  // Cada intento de marcar un punto de control (válido o no): base de la auditoría antifraude de rondas.
+  // round_points guarda solo la marca válida; acá queda todo lo que el guardia intentó.
+  `CREATE TABLE IF NOT EXISTS round_scans (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    round_id BIGINT NOT NULL,
+    checkpoint_id INT NOT NULL,
+    user_id INT NOT NULL,
+    scanned_at DATETIME NOT NULL,
+    method ENUM('nfc','qr') NOT NULL,
+    status ENUM('valid','out_of_range','gps_inaccurate','gps_disabled','gps_denied','location_error','point_unlocated') NOT NULL,
+    lat DECIMAL(10,7) NULL,
+    lng DECIMAL(10,7) NULL,
+    accuracy_m DECIMAL(9,1) NULL,
+    distance_m DECIMAL(10,1) NULL,
+    cp_lat DECIMAL(10,7) NULL,
+    cp_lng DECIMAL(10,7) NULL,
+    cp_radius_m INT NULL,
+    geo_error VARCHAR(20) NULL,
+    device VARCHAR(60) NULL,
+    browser VARCHAR(40) NULL,
+    ip VARCHAR(45) NULL,
+    INDEX ix_rs_round (round_id, scanned_at),
+    INDEX ix_rs_status (tenant_id, status, scanned_at),
+    INDEX ix_rs_cp (checkpoint_id, scanned_at),
+    FOREIGN KEY (round_id) REFERENCES rounds(id) ON DELETE CASCADE,
+    FOREIGN KEY (checkpoint_id) REFERENCES checkpoints(id) ON DELETE CASCADE
+  )`,
 ];
 
 // [tabla, columna, definición]
@@ -181,6 +209,14 @@ const COLUMNS = [
   ['visits', 'reject_reason', 'VARCHAR(255) NULL'],
   ['visits', 'cancelled_at', 'DATETIME NULL'],
   ['visits', 'last_movement_at', 'DATETIME NULL'], // último ingreso, egreso o rechazo: ordena el historial por índice
+  // Rondas: ubicación real de cada punto de control y radio dentro del cual se acepta el escaneo
+  ['checkpoints', 'lat', 'DECIMAL(10,7) NULL'],
+  ['checkpoints', 'lng', 'DECIMAL(10,7) NULL'],
+  ['checkpoints', 'radius_m', 'INT NOT NULL DEFAULT 30'],
+  // Marca válida: con qué precisión y a qué distancia se registró, y qué intento la produjo
+  ['round_points', 'accuracy_m', 'DECIMAL(9,1) NULL'],
+  ['round_points', 'distance_m', 'DECIMAL(10,1) NULL'],
+  ['round_points', 'scan_id', 'BIGINT NULL'],
 ];
 
 // Columnas que pasan a aceptar NULL: [tabla, columna, definición completa]

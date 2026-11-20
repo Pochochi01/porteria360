@@ -280,6 +280,49 @@ test('rondas y puntos: dependencias, cascada con force y permisos', async () => 
   assert.equal(await one('SELECT id FROM rounds WHERE id=?', [round.id]), undefined);
 });
 
+test('rondas: validación geográfica del escaneo (backend decide, auditoría de intentos)', async () => {
+  const cpId = (await call('POST', '/checkpoints', { token: tok.supervisor, expect: 201,
+    body: { name: 'Portón Norte', tag_code: 'GEO-0001', lat: -26.8245, lng: -65.22229, radius_m: 30 } })).id;
+  await call('POST', '/checkpoints', { token: tok.supervisor, body: { name: 'Mal', tag_code: 'GEO-0002', lat: -26.8 }, expect: 400 });
+  await call('PUT', `/checkpoints/${cpId}`, { token: tok.supervisor, body: { lat: null }, expect: 400 });
+  await call('PUT', `/checkpoints/${cpId}`, { token: tok.guard, body: { radius_m: 500 }, expect: 403 });
+  const round = await call('POST', '/rounds/start', { token: tok.guard, body: {}, expect: 201 });
+  const scan = (body, expect) => call('POST', `/rounds/${round.id}/scan`, { token: tok.guard, body: { tag_code: 'GEO-0001', method: 'qr', ...body }, expect });
+  const pos = (dM, accuracy = 8) => ({ position: { lat: -26.8245 - dM / 111195, lng: -65.22229, accuracy, timestamp: Date.now() } });
+
+  let e = await scan({ geo_error: 'denied' }, 422);
+  assert.equal(e.status, 'gps_denied');
+  e = await scan({}, 422);
+  assert.equal(e.status, 'location_error', 'sin ubicación no se registra');
+  e = await scan(pos(185), 422);
+  assert.equal(e.status, 'out_of_range');
+  assert.equal(e.distance_m, 185);
+  assert.match(e.error, /185 metros/);
+  e = await scan(pos(3, 120), 422);
+  assert.equal(e.status, 'gps_inaccurate');
+  await scan({ position: { lat: 200, lng: 0, accuracy: 5 } }, 400);
+  assert.equal((await one('SELECT scanned_at FROM round_points WHERE round_id=? AND checkpoint_id=?', [round.id, cpId])).scanned_at, null);
+
+  const ok = await scan(pos(12), 200);
+  assert.equal(ok.scan.status, 'valid');
+  const pt = ok.points.find((x) => x.checkpoint_id === cpId);
+  assert.ok(pt.scanned_at);
+  assert.equal(Math.round(Number(pt.distance_m)), 12);
+  await scan(pos(12), 409);
+
+  const tr = await call('GET', `/rounds/${round.id}/scans`, { token: tok.supervisor, expect: 200 });
+  assert.deepEqual(tr.scans.map((s) => s.status), ['gps_denied', 'location_error', 'out_of_range', 'gps_inaccurate', 'valid']);
+  assert.equal(Number(tr.scans[2].cp_radius_m), 30);
+  await call('GET', `/rounds/${round.id}/scans`, { token: tok.guard, expect: 403 });
+  const report = await call('GET', '/round-scans?status=invalid', { token: tok.supervisor, expect: 200 });
+  assert.ok(report.some((s) => s.status === 'out_of_range' && s.round_id === round.id));
+  const aud = await query("SELECT action FROM audit_log WHERE entity='round_scan' AND tenant_id=? ORDER BY id", [tenantId]);
+  assert.deepEqual(aud.map((a) => a.action).slice(-3), ['gps_denied', 'out_of_range', 'gps_inaccurate']);
+
+  await call('DELETE', `/rounds/${round.id}`, { token: tok.admin, expect: 200 });
+  await call('DELETE', `/checkpoints/${cpId}?force=1`, { token: tok.admin, expect: 200 });
+});
+
 test('expensas: edición restringida si hay pago, borrar pago recalcula estado, cascada', async () => {
   const s = await query("INSERT INTO expense_settlements (tenant_id,lot_id,period,amount,due_date) VALUES (?,?,'2026-01',1000,'2026-01-10')", [tenantId, ids.lot]);
   ids.settlement = s.insertId;

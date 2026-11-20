@@ -39,7 +39,8 @@ app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      'img-src': ["'self'", 'data:', 'blob:'],
+      // tile.openstreetmap.org: mapa de puntos de control y recorridos de rondas
+      'img-src': ["'self'", 'data:', 'blob:', 'https://tile.openstreetmap.org'],
       // Video institucional externo de cada complejo
       // blob: visor de comprobantes PDF (descargados con la sesión); YouTube/Vimeo: video institucional
       'frame-src': ["'self'", 'blob:', 'https://www.youtube-nocookie.com', 'https://player.vimeo.com'],
